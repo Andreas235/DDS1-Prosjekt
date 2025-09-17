@@ -1,10 +1,5 @@
-# Binary (bit-serial) Montgomery modular exponentiation with fixed 256-bit words.
-# - Assumes: modulus n is odd and fits in 256 bits
-# - Uses: R = 2^256, classic "if T is odd add n, then shift" REDC loop.
 
 #BINARY MONTGOMERY
-
-from typing import Tuple
 
 R_BITS = 256
 R = 1 << R_BITS
