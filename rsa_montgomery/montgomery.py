@@ -73,7 +73,7 @@ def montgomery_pow(base, exponent, modulus):
         if (exponent >> bit) & 1:
             acc = monpro(acc, base_bar, modulus) # multiply (Montgomery domain)
 
-    return from_montgomery(acc, modulus)
+    return monpro(acc, 1, modulus)
 
 
 
