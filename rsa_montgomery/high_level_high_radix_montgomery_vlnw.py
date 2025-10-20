@@ -1,34 +1,82 @@
-# HIGH-RADIX (w=32) VLNW MONTGOMERY
+# HIGH-RADIX MONTGOMERY WITH VLNW
 import random
 
-R_BITS = 256
+# -----------------------------
+# PARAMETERS
+# -----------------------------
+R_BITS = 256          # modulus length in bits
+WORD_BITS = 32        # high-radix word size
 R = 1 << R_BITS
-W_BITS = 32
-W_MASK = (1 << W_BITS) - 1
-S_WORDS = R_BITS // W_BITS  # 256/32 = 8 words
 
 # Global multiplication counter
 mul_count = 0
 
 # -----------------------------
-# HIGH-RADIX MONTGOMERY REDC
+# Helpers
 # -----------------------------
-def montgomery_redc_highradix(T, n):
-    """High-radix Montgomery reduction, w=32"""
-    for _ in range(S_WORDS):
-        u0 = T & W_MASK
-        n0_inv = pow(n & W_MASK, -1, 1 << W_BITS)  # n0^-1 mod 2^w
-        m = (u0 * n0_inv) & W_MASK
-        T = (T + m * n) >> W_BITS
-    if T >= n:
-        T -= n
-    return T
+def int_to_words(x, w=WORD_BITS):
+    """Split integer into list of w-bit words, LSB first."""
+    words = []
+    mask = (1 << w) - 1
+    while x:
+        words.append(x & mask)
+        x >>= w
+    return words or [0]
 
-def monpro_highradix(a_bar, b_bar, n):
+def words_to_int(words, w=WORD_BITS):
+    """Combine list of w-bit words into integer."""
+    x = 0
+    for i in reversed(range(len(words))):
+        x = (x << w) | words[i]
+    return x
+
+def modinv(a, m):
+    """Modular inverse using extended Euclidean algorithm."""
+    g, x, y = extended_gcd(a, m)
+    if g != 1:
+        raise ValueError("No modular inverse")
+    return x % m
+
+def extended_gcd(a, b):
+    """Extended GCD algorithm."""
+    if b == 0:
+        return a, 1, 0
+    g, y, x = extended_gcd(b, a % b)
+    y -= (a // b) * x
+    return g, x, y
+
+# -----------------------------
+# High-Radix Montgomery Multiplication
+# -----------------------------
+def monpro_hr(a_bar, b_bar, n, w=WORD_BITS):
+    """
+    High-Radix Montgomery multiplication:
+    Computes a_bar * b_bar * R^-1 mod n
+    """
     global mul_count
     mul_count += 1
-    T = a_bar * b_bar
-    return montgomery_redc_highradix(T, n)
+
+    # Precompute n0_inv = -n0^-1 mod 2^w
+    n0 = n & ((1 << w) - 1)
+    n0_inv = (-modinv(n0, 1 << w)) & ((1 << w) - 1)
+
+    A = int_to_words(a_bar, w)
+    B = int_to_words(b_bar, w)
+    s = len(A)
+    u = 0
+
+    for i in range(s):
+        Ai = A[i]
+        # Multiply-add step
+        u += Ai * b_bar
+        u0 = u & ((1 << w) - 1)
+        m = (u0 * n0_inv) & ((1 << w) - 1)
+        u += m * n
+        u >>= w
+
+    if u >= n:
+        u -= n
+    return u
 
 # -----------------------------
 # Conversions to/from Montgomery domain
@@ -37,7 +85,7 @@ def to_montgomery(a, n):
     return (a << R_BITS) % n
 
 def from_montgomery(a_bar, n):
-    return montgomery_redc_highradix(a_bar, n)
+    return monpro_hr(a_bar, 1, n)  # multiply by 1 in HR-MonPro
 
 # -----------------------------
 # VLNW schedule generator
@@ -65,16 +113,15 @@ def vlnw_schedule(exponent: int, d: int = 4):
 def precompute_base_powers(base_bar, modulus, d=4):
     max_w = (1 << d) - 1
     powers = {1: base_bar}
-    M2 = monpro_highradix(base_bar, base_bar, modulus)
+    M2 = monpro_hr(base_bar, base_bar, modulus)
     for w in range(3, max_w + 1, 2):
-        powers[w] = powers[w - 2]
-        powers[w] = monpro_highradix(powers[w], M2, modulus)
+        powers[w] = monpro_hr(powers[w - 2], M2, modulus)
     return powers
 
 # -----------------------------
-# VLNW High-Radix Montgomery exponentiation
+# VLNW Montgomery exponentiation (High-Radix)
 # -----------------------------
-def montgomery_pow_vlnw_highradix(base, exponent, modulus, d=4):
+def montgomery_pow_vlnw_hr(base, exponent, modulus, d=4):
     if modulus == 1:
         return 0
     base %= modulus
@@ -84,43 +131,45 @@ def montgomery_pow_vlnw_highradix(base, exponent, modulus, d=4):
     one_bar  = to_montgomery(1, modulus)
     base_bar = to_montgomery(base, modulus)
 
-    # Precompute odd powers
     powers = precompute_base_powers(base_bar, modulus, d)
     schedule = vlnw_schedule(exponent, d)
 
     acc = one_bar
     for win_val, win_len in reversed(schedule):
         for _ in range(win_len):
-            acc = monpro_highradix(acc, acc, modulus)  # square
+            acc = monpro_hr(acc, acc, modulus)  # square
         if win_val != 0:
-            acc = monpro_highradix(acc, powers[win_val], modulus)  # multiply
+            acc = monpro_hr(acc, powers[win_val], modulus)  # multiply
 
     return from_montgomery(acc, modulus)
 
 # -----------------------------
-# Simple test
+# -----------------------------
+# TEST
 # -----------------------------
 if __name__ == "__main__":
-    # Random 256-bit message
-    M = random.getrandbits(255)
-
+    # Example 256-bit RSA modulus and exponents
     key_n = 0x99925173ad65686715385ea800cd28120288fc70a9bc98dd4c90d676f8ff768d
     key_d = 0x0cea1651ef44be1f1f1476b7539bed10d73e3aac782bd9999a1e5a790932bfe9
     key_e = 0x0000000000000000000000000000000000000000000000000000000000010001
 
+    # Random message
+    M = random.getrandbits(255)
+
     print("Original M:", M)
-    print("Testing VLNW high-radix (w=32) Montgomery for 256-bit numbers...")
+    print("Testing VLNW high-radix Montgomery (w={} bits)...".format(WORD_BITS))
 
+    # Encryption
     mul_count = 0
-    C_vlnw = montgomery_pow_vlnw_highradix(M, key_e, key_n, d=4)
-    print("VLNW High-Radix Montgomery C:", C_vlnw)
-    print("VLNW High-Radix multiplications:", mul_count)
+    C = montgomery_pow_vlnw_hr(M, key_e, key_n, d=4)
+    print("Ciphertext C:", C)
+    print("Multiplications:", mul_count)
 
-    # Decryption-like check
+    # Decryption
     mul_count = 0
-    M_vlnw = montgomery_pow_vlnw_highradix(C_vlnw, key_d, key_n, d=4)
-    print("VLNW High-Radix Montgomery M_vlnw:", M_vlnw)
-    print("Multiplications (decryption):", mul_count)
+    M_dec = montgomery_pow_vlnw_hr(C, key_d, key_n, d=4)
+    print("Decrypted M:", M_dec)
+    print("Multiplications:", mul_count)
 
-    assert M_vlnw == M, "High-Radix VLNW encryption/decryption failed!"
-    print("256-bit High-Radix VLNW test passed!")
+    assert M_dec == M, "High-radix VLNW failed!"
+    print("High-radix VLNW test passed!")
