@@ -25,12 +25,8 @@ architecture rtl of VLNW_Controller_Sched is
 
     signal entry_count  : std_logic_vector(6 downto 0); -- total number of entries
     signal entry_index  : std_logic_vector(6 downto 0); -- current entry index (max 128 entries)
-    signal sq_count     : std_logic_vector(1 downto 0); -- countdown squaring
+    signal sq_count     : std_logic_vector(2 downto 0); -- countdown squaring
     signal precompute_index    : std_logic_vector(3 downto 0);
-    signal num_squares  : std_logic_vector(1 downto 0);
-
-    -- Registers to hold current entry
-    signal entry_word   : std_logic_vector(5 downto 0);
 
     -- Temporary storage for schedule
     signal vlnw_schedule: std_logic_vector(508 downto 0);
@@ -42,6 +38,7 @@ begin
 
     -- Sequential process: state and counters
     process(clk, rst)
+    variable entry_word : std_logic_vector(5 downto 0);
     begin
         if rst = '1' then
             state       <= IDLE;
@@ -74,16 +71,13 @@ begin
             -- Load new entry on FETCH
             if state = FETCH then
                 -- Each entry is 6 bits
-                entry_word <= vlnw_schedule(
+                entry_word := vlnw_schedule(
                     508 - 7 - to_integer(unsigned(entry_index)) * 6 downto
                     508 - 7 - to_integer(unsigned(entry_index)) * 6 - 5
                 );                
                 precompute_index  <= entry_word(5 downto 2);
-                num_squares <= std_logic_vector(unsigned(entry_word(1 downto 0)) + 1);
-                sq_count   <= num_squares;
+                sq_count <= std_logic_vector(resize(unsigned(entry_word(1 downto 0)) + 1, 3));
             end if;
-            
-            
         end if;
     end process;
 
