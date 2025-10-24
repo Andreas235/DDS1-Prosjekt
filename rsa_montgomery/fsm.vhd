@@ -24,11 +24,11 @@ use ieee.numeric_std.all;
 entity fsm is
     port(
         clk                      : in  std_logic;
-        reset                    : in  std_logic;
-        start                    : in  std_logic;
         monpro_done              : in  std_logic;        
         square_count             : in  std_logic_vector(1 downto 0);
         mult                     : in  std_logic;        
+        load                     : in  std_logic;        
+        done                     : in  std_logic;        
         
         shift                    : out std_logic;
         op                       : out std_logic_vector(1 downto 0)
@@ -42,7 +42,7 @@ architecture rtl of fsm is
     constant monpro_multiply    : std_logic_vector(1 downto 0) := "10";
     
     type state_type is (
-        IDLE, 
+        STOP, READ, 
         SQUARE_4, SQUARE_3, SQUARE_2, SQUARE_1,
         MULTIPLY,
         SHIFT_state
@@ -51,15 +51,24 @@ architecture rtl of fsm is
 
 begin
 
-    main_statemachine_process : process (state, start, monpro_done, square_count, mult)
+    main_statemachine_process : process (state, load, done, monpro_done, square_count, mult)
     begin
     
         case(state) is
-            when IDLE =>
+            when STOP =>
                 shift <= '0';
                 op <= monpro_wait;
-                if start = '0' then
-                   state_next <= IDLE;
+                if load = '1' then
+                    state_next <= READ;
+                else
+                    state_next <= STOP;
+                end if;
+                                
+            when READ =>
+                shift <= '0';
+                op <= monpro_wait;
+                if done = '1' then
+                    state_next <= STOP;
                 else
                     if square_count = "11" then
                         state_next <= SQUARE_4;
@@ -71,7 +80,7 @@ begin
                         state_next <= SQUARE_1;
                     end if;
                 end if;
-
+                
             when SQUARE_4 =>
                 shift <= '0';
                 op <= monpro_square; 
@@ -125,17 +134,15 @@ begin
             when SHIFT_state =>
                 shift <= '1';
                 op <= monpro_wait; 
-                state_next <= IDLE;
+                state_next <= READ;
                 
 		end case;
 	end process main_statemachine_process;
 
 
-	update_state : process (reset, clk)
+	update_state : process (clk)
 	begin
-		if (reset = '0') then
-			state <= IDLE;
-		elsif (rising_edge(clk)) then
+		if (rising_edge(clk)) then
 			state <= state_next;
 		end if;
 	end process update_state;

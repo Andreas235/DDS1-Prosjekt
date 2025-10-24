@@ -91,7 +91,6 @@ begin
         ----------------------------------------------------------------
         report "Loading schedule";
 
-        -- Example data: length = 8 entries ("0001000")
         vlnw_schedule_0(255 downto 249) <= "0000100";
         vlnw_schedule_0(248 downto 3)  <= (others => '0');
         vlnw_schedule_1                <= (others => '0');
@@ -105,12 +104,31 @@ begin
         load <= '0';
         wait for CLK_PERIOD * 2;
 
-        ----------------------------------------------------------------
-        -- Shift a few times to simulate FSM advancement
+        for i in 0 to 20 loop
+            wait for MONPRO_TIME;
+            -- The FSM inside will toggle 'shift' internally, so we can 
+            -- simulate external activity by toggling monpro_done
+            monpro_done <= '1';
+            wait for CLK_PERIOD;
+            monpro_done <= '0';
+        end loop;
+
+        vlnw_schedule_0(255 downto 249) <= "0000100";
+        vlnw_schedule_0(248 downto 3)  <= (others => '0');
+        vlnw_schedule_1                <= (others => '0');
+        vlnw_schedule_0(248 downto 243) <= "111111";  
+        vlnw_schedule_0(242 downto 237) <= "000000";
+        vlnw_schedule_0(236 downto 231) <= "101010";
+        vlnw_schedule_0(230 downto 225) <= "000011";
+
+        load <= '1';
+        wait for CLK_PERIOD;
+        load <= '0';
+--           -- Shift a few times to simulate FSM advancement
         ----------------------------------------------------------------
         report "Starting shift sequence";
 
-        for i in 0 to 30 loop
+        for i in 0 to 20 loop
             wait for MONPRO_TIME;
             -- The FSM inside will toggle 'shift' internally, so we can 
             -- simulate external activity by toggling monpro_done
@@ -124,8 +142,10 @@ begin
         ----------------------------------------------------------------
         wait for 100 ns;
         report "Simulation finished";
-        wait;
-    end process;
+        wait;     wait for CLK_PERIOD * 2;
+  
+end process;
+
 
 end sim;
 
