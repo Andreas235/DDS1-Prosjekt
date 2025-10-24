@@ -9,8 +9,8 @@ architecture sim of fsm_tb is
 
     -- DUT signals
     signal clk          : std_logic := '0';
-    signal reset        : std_logic := '0';  -- note: active low in DUT
-    signal start        : std_logic := '0';
+    signal mult         : std_logic := '0';
+    signal mult         : std_logic := '0';
     signal monpro_done  : std_logic := '0';
     signal square_count : std_logic_vector(1 downto 0) := "00";
     signal mult         : std_logic := '0';
@@ -25,7 +25,6 @@ begin
     uut: entity work.fsm
         port map(
             clk          => clk,
-            reset        => reset,
             start        => start,
             monpro_done  => monpro_done,
             square_count => square_count,
@@ -52,11 +51,7 @@ begin
         square_count <= "00";
         mult <= '0';
 
-        -- Apply reset (active low)
-        reset <= '0';
-        wait for 25 ns;    -- hold reset for a couple cycles
-        reset <= '1';
-        wait for 20 ns;
+
 
         -- Case 1: square_count = "11" (SQUARE_4 path)
         report "Starting test: square_count = 11";
