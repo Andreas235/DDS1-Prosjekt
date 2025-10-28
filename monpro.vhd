@@ -28,7 +28,9 @@ architecture rtl of monpro is
   -- Types
   subtype word_t is unsigned(W-1 downto 0);
   type    vec_t  is array (0 to K-1) of word_t;
-  type    acc_t  is array (0 to K)   of word_t; -- K+1 words (top slot)
+  
+  -- Accumulator: K low words + one (W+1)-bit top slot
+  type    acc_core_t is array (0 to K-1) of word_t;
 
   -- Pack/unpack helpers (little-endian limbs)
   function unpack(slv: std_logic_vector) return vec_t is
@@ -50,12 +52,16 @@ architecture rtl of monpro is
 
   -- Registers / storage
   signal A_reg, B_reg, N_reg : vec_t;
-  signal T                   : acc_t;     -- T[0..K]
   signal i_idx               : integer range 0 to K-1 := 0;
   signal j_idx               : integer range 0 to K-1 := 0;
 
-  signal carry               : word_t := (others => '0');
+  -- NEW (W+1 bits)
+  signal carry : unsigned(W downto 0) := (others => '0');
   signal m_word              : word_t := (others => '0');
+  
+  signal  T_core : acc_core_t;
+  -- NEW (must hold two 33-bit folds)
+  signal  T_top  : unsigned(W+1 downto 0);  -- 34 bits when W=32
 
   signal r_reg               : std_logic_vector(K*W-1 downto 0) := (others => '0');
 
@@ -82,32 +88,38 @@ architecture rtl of monpro is
   attribute use_dsp of mul0_p : signal is "yes";
   attribute use_dsp of mul1_p : signal is "yes";
 
-  -- FSM
-    -- FSM
+  -- FSM (Straight CIOS: AB phase → compute m → MN phase → shift)
   type state_t is (
     S_IDLE, S_LOAD,
 
-    -- m = low32(T0 * n') via two 16x16 passes (kept as SET/USE for safety)
-    S_I_INIT,
+    -- per-i, Phase 1: AB accumulation across all j (no m yet)
+    S_AB_J_PREP,
+    S_AB0, S_AB1,           -- two 16x16 passes to build 32x32 product
+    S_AB_ADD,               -- add ab + T[j] + carry
+    S_AB_NEXT,              -- advance j or finish AB phase
+    S_AB_FOLD,              -- T(K) += carry; carry := 0
+
+    -- Compute m = low32( T(0) * n' )  (uses updated T(0)!)
     S_M0_SET, S_M0_USE,
     S_M1_SET, S_M1_USE,
 
-    -- per-j: collapse to single-cycle passes (AB0, AB1, MN0, MN1), keep ADD
-    S_J_PREP,
-    S_AB0,
-    S_AB1,
-    S_MN0,
-    S_MN1,
-    S_ADD,
+    -- per-i, Phase 2: MN accumulation across all j (uses the m above)
+    S_MN_J_PREP,
+    S_MN0, S_MN1,           -- two 16x16 passes to build 32x32 product
+    S_MN_ADD,               -- add (m*n) + T[j] + carry
+    S_MN_NEXT,              -- advance j or finish MN phase
+    S_MN_FOLD,              -- T(K) += carry; carry := 0
 
-    S_AFTER_J,
-    S_NEXT_I, S_FINAL, S_DONE
+    -- end of i-iteration
+    S_SHIFT,                -- logical right shift by one word (drop T0)
+    S_NEXT_I,               -- increment i or finish
+
+    S_FINAL, S_DONE
   );
-
   signal st, st_n : state_t := S_IDLE;
 
 begin
-  -- Shared multipliers (2 DSPs total)
+  -- DSPs
   mul0_p <= mul0_a * mul0_b;
   mul1_p <= mul1_a * mul1_b;
 
@@ -134,61 +146,69 @@ begin
   ------------------------------------------------------------------
   -- Next-state logic
   ------------------------------------------------------------------
-   process(st, start, j_idx, i_idx)
+  process(st, start, j_idx, i_idx)
   begin
     st_n <= st;
     case st is
       when S_IDLE    => if start='1' then st_n <= S_LOAD; end if;
-      when S_LOAD    => st_n <= S_I_INIT;
+      when S_LOAD    => st_n <= S_AB_J_PREP;
 
-      when S_I_INIT  => st_n <= S_M0_SET;
-      when S_M0_SET  => st_n <= S_M0_USE;
-      when S_M0_USE  => st_n <= S_M1_SET;
-      when S_M1_SET  => st_n <= S_M1_USE;
-      when S_M1_USE  => st_n <= S_J_PREP;
+      -- Phase 1: AB over all j
+      when S_AB_J_PREP => st_n <= S_AB0;
+      when S_AB0       => st_n <= S_AB1;
+      when S_AB1       => st_n <= S_AB_ADD;
+      when S_AB_ADD    => st_n <= S_AB_NEXT;
+      when S_AB_NEXT   =>
+        if j_idx = K-1 then st_n <= S_AB_FOLD;
+        else               st_n <= S_AB_J_PREP;
+        end if;
+      when S_AB_FOLD   => st_n <= S_M0_SET;
 
-      when S_J_PREP  => st_n <= S_AB0;
-      when S_AB0     => st_n <= S_AB1;
-      when S_AB1     => st_n <= S_MN0;
-      when S_MN0     => st_n <= S_MN1;
-      when S_MN1     => st_n <= S_ADD;
+      -- m = low32(T0 * n')
+      when S_M0_SET    => st_n <= S_M0_USE;
+      when S_M0_USE    => st_n <= S_M1_SET;
+      when S_M1_SET    => st_n <= S_M1_USE;
+      when S_M1_USE    => st_n <= S_MN_J_PREP;
 
-      when S_ADD =>
-        if j_idx = K-1 then st_n <= S_AFTER_J;
-        else               st_n <= S_J_PREP;
+      -- Phase 2: MN over all j
+      when S_MN_J_PREP => st_n <= S_MN0;
+      when S_MN0       => st_n <= S_MN1;
+      when S_MN1       => st_n <= S_MN_ADD;
+      when S_MN_ADD    => st_n <= S_MN_NEXT;
+      when S_MN_NEXT   =>
+        if j_idx = K-1 then st_n <= S_MN_FOLD;
+        else               st_n <= S_MN_J_PREP;
+        end if;
+      when S_MN_FOLD   => st_n <= S_SHIFT;
+
+      when S_SHIFT     => st_n <= S_NEXT_I;
+
+      when S_NEXT_I    =>
+        if i_idx = K-1 then st_n <= S_FINAL;
+        else               st_n <= S_AB_J_PREP;
         end if;
 
-      when S_AFTER_J => st_n <= S_NEXT_I;
-
-      when S_NEXT_I =>
-        if i_idx = K-1 then
-          st_n <= S_FINAL;
-        else
-          st_n <= S_I_INIT;
-        end if;
-
-      when S_FINAL   => st_n <= S_DONE;
-      when S_DONE    => st_n <= S_IDLE;
+      when S_FINAL     => st_n <= S_DONE;
+      when S_DONE      => st_n <= S_IDLE;
     end case;
   end process;
-
 
   ------------------------------------------------------------------
   -- Datapath + control
   ------------------------------------------------------------------
   process(clk)
     variable sum64, tmp64 : unsigned(63 downto 0);
+    variable sum66, tmp66 : unsigned(65 downto 0);
     -- final packaging/compare/subtract
     variable res_vec : vec_t;
     variable ge_flag, eq_flag : boolean;
     variable wext_x, wext_y, tmp_w : unsigned(W downto 0);
     variable borrow  : unsigned(0 downto 0);
     variable idx_msw : integer;
-    -- carry-fold shift helper
+    -- helpers
     variable high_after : word_t;
-    -- loop index for clears
     variable kclr : integer;
-    variable m_word_v : word_t;  -- NEW: to hold low32(T0*n') this cycle
+    variable m_word_v : word_t;
   begin
     if rising_edge(clk) then
       if reset_n = '0' then
@@ -198,9 +218,10 @@ begin
           B_reg(kclr) <= (others => '0');
           N_reg(kclr) <= (others => '0');
         end loop;
-        for kclr in 0 to K loop
-          T(kclr) <= (others => '0');
+        for kclr in 0 to K-1 loop
+          T_core(kclr) <= (others => '0');
         end loop;
+        T_top <= (others => '0');
 
         i_idx   <= 0;
         j_idx   <= 0;
@@ -228,155 +249,169 @@ begin
             A_reg <= unpack(a);
             B_reg <= unpack(b);
             N_reg <= unpack(n);
-            for kclr in 0 to K loop T(kclr) <= (others => '0'); end loop;
+            for kclr in 0 to K-1 loop
+                T_core(kclr) <= (others => '0');
+            end loop;
+            T_top <= (others => '0');
             i_idx  <= 0;
             j_idx  <= 0;
             carry  <= (others => '0');
 
           ------------------------------------------------------------
-          -- m = low32( T(0) * nprime_u ) via two 16x16 passes
-          when S_I_INIT =>
-            m_lo64 <= (others => '0');
-            m_hi64 <= (others => '0');
-            m_lo   <= T(0)(15 downto 0);
-            m_hi   <= T(0)(31 downto 16);
-            n_lo   <= nprime_u(15 downto 0);
-            n_hi   <= nprime_u(31 downto 16);
-
-          when S_M0_SET =>
-            -- q0 = m_lo * n_lo (<<0); q1 = m_hi * n_lo (<<16)
-            mul0_a <= m_lo; mul0_b <= n_lo;
-            mul1_a <= m_hi; mul1_b <= n_lo;
-
-          when S_M0_USE =>
-            tmp64  := resize(mul0_p,64)
-                      + shift_left(resize(mul1_p,64), 16);
-            m_lo64 <= tmp64;
-
-          when S_M1_SET =>
-            -- q2 = m_lo * n_hi (<<16); q3 = m_hi * n_hi (<<32)
-            mul0_a <= m_lo; mul0_b <= n_hi;
-            mul1_a <= m_hi; mul1_b <= n_hi;
-
-          when S_M1_USE =>
-          -- Compute the "hi" partial of T0 * n' for this pass
-          tmp64  := shift_left(resize(mul0_p,64), 16)
-                    + shift_left(resize(mul1_p,64), 32);
-        
-          -- Form the FULL 64-bit product using the *fresh* tmp64 (hi) and the
-          -- m_lo64 captured in S_M0_USE (lo). Do NOT read m_hi64 here.
-          sum64    := m_lo64 + tmp64;
-        
-          -- Update the pipeline registers
-          m_hi64   <= tmp64;
-        
-          -- Low 32 bits are m (Montgomery "m" = low32(T0 * n'))
-          m_word_v := word_t(sum64(31 downto 0));
-          m_word   <= m_word_v;
-        
-          -- VERY IMPORTANT: refresh m_lo/m_hi from the *new* m_word for MN passes
-          m_lo     <= m_word_v(15 downto 0);
-          m_hi     <= m_word_v(31 downto 16);
-        
-          carry    <= (others => '0');
-
-          ------------------------------------------------------------
-          -- Prepare j operands and PRELOAD AB0 multiplier inputs
-          when S_J_PREP =>
+          -- Phase 1: AB accumulation over j (no m yet)
+          when S_AB_J_PREP =>
+            -- prepare splits from registers and PRELOAD AB0
             a_lo <= A_reg(i_idx)(15 downto 0);
             a_hi <= A_reg(i_idx)(31 downto 16);
             b_lo <= B_reg(j_idx)(15 downto 0);
             b_hi <= B_reg(j_idx)(31 downto 16);
-            n_lo <= N_reg(j_idx)(15 downto 0);
-            n_hi <= N_reg(j_idx)(31 downto 16);
 
-            -- clear partials
+            -- clear AB partials (MN unused this phase)
             ab_lo64 <= (others => '0'); ab_hi64 <= (others => '0');
-            mn_lo64 <= (others => '0'); mn_hi64 <= (others => '0');
 
-            -- PRELOAD AB0 operands for the next cycle (use sources, not just-updated splits)
+            -- PRELOAD AB0 operands
             mul0_a <= A_reg(i_idx)(15 downto 0);
             mul1_a <= A_reg(i_idx)(31 downto 16);
             mul0_b <= B_reg(j_idx)(15 downto 0);
             mul1_b <= B_reg(j_idx)(15 downto 0);
 
-
-         ------------------------------------------------------------
-          -- AB0: USE current mul products; PRELOAD AB1 operands
           when S_AB0 =>
-            -- products seen here correspond to J_PREP's operand preload
+            -- USE AB0 products; PRELOAD AB1
             tmp64   := resize(mul0_p,64)
-                      + shift_left(resize(mul1_p,64), 16);
+                     + shift_left(resize(mul1_p,64), 16);
             ab_lo64 <= tmp64;
 
-            -- PRELOAD AB1 operands for next cycle
             mul0_a <= a_lo; mul0_b <= b_hi;
             mul1_a <= a_hi; mul1_b <= b_hi;
 
-         ------------------------------------------------------------
-          -- AB1: USE current mul products; PRELOAD MN0 operands
           when S_AB1 =>
+            -- USE AB1 products
             tmp64   := shift_left(resize(mul0_p,64), 16)
-                      + shift_left(resize(mul1_p,64), 32);
+                     + shift_left(resize(mul1_p,64), 32);
             ab_hi64 <= tmp64;
 
-            -- PRELOAD MN0 operands (m * n_lo)
-            mul0_a <= m_lo; mul0_b <= n_lo;
-            mul1_a <= m_hi; mul1_b <= n_lo;
+          when S_AB_ADD =>
+            -- T[j] := T[j] + ab + carry
+            tmp66  := resize(ab_lo64, 66) + resize(ab_hi64, 66);
+            sum66  := tmp66 + resize(T_core(j_idx), 66) + resize(carry, 66);
+            T_core(j_idx) <= word_t(sum66(31 downto 0));       -- low 32 bits
+            carry         <=         sum66(64 downto 32);      -- **33-bit carry**
 
-        
-            
-          ------------------------------------------------------------
-          -- MN0: USE current mul products; PRELOAD MN1 operands
-          when S_MN0 =>
-            tmp64   := resize(mul0_p,64)
-                      + shift_left(resize(mul1_p,64), 16);
-            mn_lo64 <= tmp64;
-
-            -- PRELOAD MN1 operands (m * n_hi)
-            mul0_a <= m_lo; mul0_b <= n_hi;
-            mul1_a <= m_hi; mul1_b <= n_hi;
-
-  
-            
-          ------------------------------------------------------------
-          -- MN1: USE current mul products
-          when S_MN1 =>
-            tmp64   := shift_left(resize(mul0_p,64), 16)
-                      + shift_left(resize(mul1_p,64), 32);
-            mn_hi64 <= tmp64;
-
-          ------------------------------------------------------------
-          when S_ADD =>
-            -- sum64 = (ab_lo64+ab_hi64) + (mn_lo64+mn_hi64) + T[j] + carry
-            sum64 := ab_lo64 + ab_hi64;
-            sum64 := sum64 + mn_lo64 + mn_hi64;
-            sum64 := sum64 + resize(T(j_idx),64) + resize(carry,64);
-
-            T(j_idx) <= word_t(sum64(31 downto 0));
-            carry    <= word_t(sum64(63 downto 32));
-
+          when S_AB_NEXT =>
             if j_idx < K-1 then
               j_idx <= j_idx + 1;
             end if;
 
-          ------------------------------------------------------------
-          when S_AFTER_J =>
-            -- CIOS: fold final carry and logical shift by one word
-            high_after := word_t(unsigned(T(K)) + unsigned(carry));
-
-            -- new T(0..K-2) = old T(1..K-1)
-            for kclr in 0 to K-2 loop
-              T(kclr) <= T(kclr+1);
-            end loop;
-            T(K-1) <= high_after;   -- lands here after shift
-            T(K)   <= (others => '0');
-
-            carry  <= (others => '0');
-            j_idx  <= 0;
+          when S_AB_FOLD =>
+            -- fold carry into T(K) after AB phase; reset carry; j := 0
+            T_top <= resize(T_top, W+2) + resize(carry, W+2);
+            carry <= (others => '0');
+            j_idx <= 0;
 
           ------------------------------------------------------------
+          -- Compute m = low32( T(0) * n' ) with two 16x16 passes
+            when S_M0_SET =>
+              -- *** drive DSPs DIRECTLY from T(0) and n' ***
+              m_lo64 <= (others => '0');
+              m_hi64 <= (others => '0');
+            
+              -- split once for readability (locals are variables/signals, either is fine)
+              a_lo <= T_core(0)(15 downto 0);
+              a_hi <= T_core(0)(31 downto 16);
+              n_lo <= nprime_u(15 downto 0);
+              n_hi <= nprime_u(31 downto 16);
+            
+              -- S_M0_SET (first pass)
+            mul0_a <= T_core(0)(15 downto 0);      -- a_lo
+            mul0_b <= nprime_u(15 downto 0);       -- n_lo
+            mul1_a <= T_core(0)(31 downto 16);     -- a_hi
+            mul1_b <= nprime_u(15 downto 0);       -- n_lo
+            
+            when S_M0_USE =>
+              tmp64  := resize(mul0_p,64) + shift_left(resize(mul1_p,64), 16);
+              m_lo64 <= tmp64;
+            
+            when S_M1_SET =>
+              -- S_M1_SET (second pass)
+              mul0_a <= T_core(0)(15 downto 0);      -- a_lo
+              mul0_b <= nprime_u(31 downto 16);      -- n_hi
+              mul1_a <= T_core(0)(31 downto 16);     -- a_hi
+              mul1_b <= nprime_u(31 downto 16);      -- n_hi
+            
+            when S_M1_USE =>
+              tmp64   := shift_left(resize(mul0_p,64), 16)
+                      + shift_left(resize(mul1_p,64), 32);
+              m_hi64  <= tmp64;
+            
+              -- full 64-bit product of T(0)*n', keep low32 only
+              sum64   := m_lo64 + tmp64;
+              m_word  <= word_t(sum64(31 downto 0));
+            
+              -- cache halves of m for the MN phase (this is the ONLY place to set them)
+              m_lo    <= sum64(15 downto 0);
+              m_hi    <= sum64(31 downto 16);
+
+
+          ------------------------------------------------------------
+          -- Phase 2: MN accumulation over j (using computed m)
+          when S_MN_J_PREP =>
+            n_lo <= N_reg(j_idx)(15 downto 0);
+            n_hi <= N_reg(j_idx)(31 downto 16);
+
+            mn_lo64 <= (others => '0'); mn_hi64 <= (others => '0');
+
+            -- PRELOAD MN0 operands: m * n_lo
+            mul0_a <= m_lo; mul0_b <= n_lo;
+            mul1_a <= m_hi; mul1_b <= n_lo;
+
+          when S_MN0 =>
+            -- USE MN0 products; PRELOAD MN1
+            tmp64   := resize(mul0_p,64)
+                     + shift_left(resize(mul1_p,64), 16);
+            mn_lo64 <= tmp64;
+
+            mul0_a <= m_lo; mul0_b <= n_hi;
+            mul1_a <= m_hi; mul1_b <= n_hi;
+
+          when S_MN1 =>
+            -- USE MN1 products
+            tmp64   := shift_left(resize(mul0_p,64), 16)
+                     + shift_left(resize(mul1_p,64), 32);
+            mn_hi64 <= tmp64;
+
+          when S_MN_ADD =>
+            -- T[j] := T[j] + (m*n) + carry
+            tmp66  := resize(mn_lo64, 66) + resize(mn_hi64, 66);
+            sum66  := tmp66 + resize(T_core(j_idx), 66) + resize(carry, 66);
+            T_core(j_idx) <= word_t(sum66(31 downto 0));
+            carry         <=         sum66(64 downto 32);      -- **33-bit carry**
+
+          when S_MN_NEXT =>
+            if j_idx < K-1 then
+              j_idx <= j_idx + 1;
+            end if;
+
+          when S_MN_FOLD =>
+            -- fold carry after MN phase; reset carry
+            T_top <= resize(T_top, W+2) + resize(carry, W+2);
+            carry <= (others => '0');
+
+          ------------------------------------------------------------
+          when S_SHIFT =>
+          -- take only the low W bits from the wide top
+          high_after := word_t(T_top(W-1 downto 0));
+        
+          -- shift the core down by one word
+          for kclr in 0 to K-2 loop
+            T_core(kclr) <= T_core(kclr+1);
+          end loop;
+          T_core(K-1) <= high_after;
+        
+          -- clear the wide top for next i-iteration
+          T_top <= (others => '0');
+
           when S_NEXT_I =>
+            j_idx <= 0;
             if i_idx < K-1 then
               i_idx <= i_idx + 1;
             end if;
@@ -385,7 +420,7 @@ begin
           when S_FINAL =>
             -- pack T[0..K-1], conditional subtract N
             for kclr in 0 to K-1 loop
-              res_vec(kclr) := T(kclr);
+              res_vec(kclr) := T_core(kclr);
             end loop;
 
             -- MSW-first compare res_vec vs N_reg
@@ -405,7 +440,6 @@ begin
             if eq_flag = true then ge_flag := true; end if;
 
             if ge_flag = true then
-              -- res_vec := res_vec - N_reg (word-serial)
               borrow := (others => '0');
               for kclr in 0 to K-1 loop
                 wext_x := resize(res_vec(kclr), W+1);
@@ -432,5 +466,6 @@ begin
   end process;
 
 end rtl;
+
 
 
