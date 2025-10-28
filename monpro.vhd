@@ -346,6 +346,8 @@ begin
               -- full 64-bit product of T(0)*n', keep low32 only
               sum64   := m_lo64 + tmp64;
               m_word  <= word_t(sum64(31 downto 0));
+              
+              report "DEBUG m = 0x" & to_hstring(std_logic_vector(m_word));
             
               -- cache halves of m for the MN phase (this is the ONLY place to set them)
               m_lo    <= sum64(15 downto 0);
@@ -355,23 +357,25 @@ begin
           ------------------------------------------------------------
           -- Phase 2: MN accumulation over j (using computed m)
           when S_MN_J_PREP =>
+            -- (optional: keep n_lo/n_hi for debug, but don't feed DSPs through them)
             n_lo <= N_reg(j_idx)(15 downto 0);
             n_hi <= N_reg(j_idx)(31 downto 16);
-
+        
             mn_lo64 <= (others => '0'); mn_hi64 <= (others => '0');
-
-            -- PRELOAD MN0 operands: m * n_lo
-            mul0_a <= m_lo; mul0_b <= n_lo;
-            mul1_a <= m_hi; mul1_b <= n_lo;
+        
+            -- PRELOAD MN0 operands: m * n_lo  (DIRECT FEED)
+            mul0_a <= m_lo;                    mul0_b <= N_reg(j_idx)(15 downto 0);
+            mul1_a <= m_hi;                    mul1_b <= N_reg(j_idx)(15 downto 0);
 
           when S_MN0 =>
             -- USE MN0 products; PRELOAD MN1
             tmp64   := resize(mul0_p,64)
-                     + shift_left(resize(mul1_p,64), 16);
+                   + shift_left(resize(mul1_p,64), 16);
             mn_lo64 <= tmp64;
-
-            mul0_a <= m_lo; mul0_b <= n_hi;
-            mul1_a <= m_hi; mul1_b <= n_hi;
+        
+            -- PRELOAD MN1 operands: m * n_hi  (DIRECT FEED)
+            mul0_a <= m_lo;                    mul0_b <= N_reg(j_idx)(31 downto 16);
+            mul1_a <= m_hi;                    mul1_b <= N_reg(j_idx)(31 downto 16);
 
           when S_MN1 =>
             -- USE MN1 products
