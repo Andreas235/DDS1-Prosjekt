@@ -41,21 +41,34 @@ architecture tb of monpro_tb is
     x"99925173AD65686715385EA800CD28120288FC70A9BC98DD4C90D676F8FF768D";
   constant C_N_PRIME : std_logic_vector(31 downto 0) := x"8833C3BB"; -- 2285093819
 
-  constant C_A : std_logic_vector(KW-1 downto 0) :=
---    x"4ED76052036851F7142CF1783B7F82D348D9B8E3E2DC4276B0CAD4E78F674692";
---    x"69ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF01234567";
-      x"1914dae33d65b78a9029940ac287486136d1a20ff5936c2774e82f676830c1a6";
-
-  constant C_B : std_logic_vector(KW-1 downto 0) :=
---    x"77802675A284891B1C4633B913C659389057BF74123211F5EAB6C841E624A906";
---    x"6EDCBA9876543210FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210";
-    x"4fc8b239c5a67176487434305023f7dcd9671c4e04dfaac67e4db3dd48796e5b";
+  constant C_A1 : std_logic_vector(KW-1 downto 0) :=
+    x"5b9e402b76181c9c95ce28ced7dde4c04d1e1f5773e9e67e4c907c8fa7c390cc";
+  constant C_B1 : std_logic_vector(KW-1 downto 0) :=
+    x"1808a604ed7dedcf26e8e371a4e312a51fae740f749aaac0ac10c9cc3469d8d4";
 
   -- Expected REDC/CIOS result: (a*b*R^{-1}) mod n
-  constant C_EXPECTED_R : std_logic_vector(KW-1 downto 0) :=
---    x"75EC707CCD93258BB10476108CDCA38017CBC29C417571B8F2AFEA77A36DCFAA";
---    x"328A777F8CDFBE115693E4C5B3C3487EDC08CAD3799F63BBA4C6F836A2E4F601";
-    x"1f5b099b8996b66507fd90de9ab2b2e5f53205e8dc578e83f624a71e49e5a8cc";
+  constant C_EXPECTED_R1 : std_logic_vector(KW-1 downto 0) :=
+    x"184b7e4d8ff947e2de26b0b8f53c163e81446674168a412ec366d81cc4b96b4e";
+
+
+  constant C_A2 : std_logic_vector(KW-1 downto 0) :=
+    x"8f60c53bb52fa76d469a3b9a490eca9b1f5772cce572ec4713846d441af9fbb1";
+  constant C_B2 : std_logic_vector(KW-1 downto 0) :=
+    x"10a2f2df9d2aa444e749ed66e18ff0900c61d1e35e8ce408f51ef74b88004abd";
+
+  -- Expected REDC/CIOS result: (a*b*R^{-1}) mod n
+  constant C_EXPECTED_R2 : std_logic_vector(KW-1 downto 0) :=
+    x"87460fc6a55cbc145a1921c2cd2b37cd7e135a065f6cb4569778f1ef6d8320d8";
+
+  constant C_A3 : std_logic_vector(KW-1 downto 0) :=
+    x"0ae6c5206a56a95614ae267f12a8bf8c62084ce19e08df8e26f99f8bc4e7135b";
+  constant C_B3 : std_logic_vector(KW-1 downto 0) :=
+    x"98ca11cc657b20aa771f4cffe1bd12dcb6a3c90bb0e1e20649bf14b4332845c1";
+
+  -- Expected REDC/CIOS result: (a*b*R^{-1}) mod n
+  constant C_EXPECTED_R3 : std_logic_vector(KW-1 downto 0) :=
+    x"1fc0f35f4a35741a9ed4fcb881a235ef8d1d5cab77236a499539e4d01cc60adc";
+
   --------------------------------------------------------------------
   -- Helper: std_logic_vector → HEX string (VHDL-93 friendly)
   --------------------------------------------------------------------
@@ -113,8 +126,8 @@ begin
     wait for 2*CLK_PERIOD;
 
     -- Drive inputs
-    a       <= C_A;
-    b       <= C_B;
+    a       <= C_A1;
+    b       <= C_B1;
     n       <= C_N;
     n_prime <= C_N_PRIME;
 
@@ -137,10 +150,74 @@ begin
     -- Always print the DUT result and expected
     report "MonPro DONE in " & integer'image(cycles) & " cycles.";
     report "  r   = 0x" & to_hex(r);
-    report "  exp = 0x" & to_hex(C_EXPECTED_R);
+    report "  exp = 0x" & to_hex(C_EXPECTED_R1);
 
     -- PASS / FAIL print
-    if r = C_EXPECTED_R then
+    if r = C_EXPECTED_R1 then
+      report "PASS: MonPro output matches expected.";
+    else
+      report "FAIL: MonPro output mismatch." severity error;
+    end if;
+            
+    -- Drive inputs
+    a       <= C_A2;
+    b       <= C_B2;
+    n       <= C_N;
+    n_prime <= C_N_PRIME;
+
+    -- Pulse start
+    wait until rising_edge(clk);
+    start <= '1';
+    wait until rising_edge(clk);
+    start <= '0';
+
+    -- Count cycles until done
+    cycles := 0;
+    loop
+      wait until rising_edge(clk);
+      cycles := cycles + 1;
+      exit when done = '1';
+    end loop;
+    
+    -- Always print the DUT result and expected
+    report "MonPro DONE in " & integer'image(cycles) & " cycles.";
+    report "  r   = 0x" & to_hex(r);
+    report "  exp = 0x" & to_hex(C_EXPECTED_R2);
+
+    -- PASS / FAIL print
+    if r = C_EXPECTED_R2 then
+      report "PASS: MonPro output matches expected.";
+    else
+      report "FAIL: MonPro output mismatch." severity error;
+    end if;
+
+    -- Drive inputs
+    a       <= C_A3;
+    b       <= C_B3;
+    n       <= C_N;
+    n_prime <= C_N_PRIME;
+
+    -- Pulse start
+    wait until rising_edge(clk);
+    start <= '1';
+    wait until rising_edge(clk);
+    start <= '0';
+
+    -- Count cycles until done
+    cycles := 0;
+    loop
+      wait until rising_edge(clk);
+      cycles := cycles + 1;
+      exit when done = '1';
+    end loop;
+    
+    -- Always print the DUT result and expected
+    report "MonPro DONE in " & integer'image(cycles) & " cycles.";
+    report "  r   = 0x" & to_hex(r);
+    report "  exp = 0x" & to_hex(C_EXPECTED_R3);
+
+    -- PASS / FAIL print
+    if r = C_EXPECTED_R3 then
       report "PASS: MonPro output matches expected.";
     else
       report "FAIL: MonPro output mismatch." severity error;
