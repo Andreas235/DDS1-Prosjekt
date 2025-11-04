@@ -51,14 +51,14 @@ entity monpro2 is
 end monpro2;
 
 architecture rtl of monpro2 is
-
     signal u    : std_logic_vector(287 downto 0) := (others  => '0');
     signal u0   : std_logic_vector(31 downto 0) := (others  => '0');
- 
+    signal tmp_prod : unsigned(63 downto 0);
+
     signal mul_A    : std_logic_vector(31 downto 0) := (others  => '0');
     signal mul_B    : std_logic_vector(255 downto 0) := (others  => '0');
     signal prod_288 : std_logic_vector(287 downto 0) := (others  => '0');
-    signal prod_64  : std_logic_vector(63 downto 0) := (others  => '0');
+    signal prod_32  : std_logic_vector(31 downto 0) := (others  => '0');
   
     signal i_idx    : integer range 0 to 7 := 0;
     
@@ -76,8 +76,10 @@ architecture rtl of monpro2 is
     
 begin
     prod_288 <= std_logic_vector(unsigned(mul_A) * unsigned(mul_B));
-    prod_64  <= std_logic_vector(unsigned(u0) * unsigned(n_prime));
+    tmp_prod <= unsigned(u0) * unsigned(n_prime);
+    prod_32  <= std_logic_vector(tmp_prod(31 downto 0));    
     r <= u(255 downto 0);
+    
     process(state, start)    
     begin
         case state is
@@ -118,7 +120,7 @@ begin
             when mult_mn =>
                 busy <= '1';
                 done <= '0';
-                mul_A <= prod_64(31 downto 0);
+                mul_A <= prod_32;
                 mul_B <= n;
                 state_next <= add_umn;
             
@@ -127,7 +129,7 @@ begin
                 done <= '0';
                 u <= std_logic_vector(unsigned(u) + unsigned(prod_288));
                 state_next <= shift_r32;
-            
+             
             when shift_r32 =>
                 busy <= '1';
                 done <= '0';
