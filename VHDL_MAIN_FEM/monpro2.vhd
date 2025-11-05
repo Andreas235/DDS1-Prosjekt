@@ -52,13 +52,10 @@ end monpro2;
 
 architecture rtl of monpro2 is
     signal u    : std_logic_vector(287 downto 0) := (others  => '0');
-    signal u0   : std_logic_vector(31 downto 0) := (others  => '0');
-    signal tmp_prod : unsigned(63 downto 0);
 
     signal mul_A    : std_logic_vector(31 downto 0) := (others  => '0');
     signal mul_B    : std_logic_vector(255 downto 0) := (others  => '0');
     signal prod_288 : std_logic_vector(287 downto 0) := (others  => '0');
-    signal prod_32  : std_logic_vector(31 downto 0) := (others  => '0');
   
     signal i_idx    : integer range 0 to 7 := 0;
     
@@ -75,9 +72,7 @@ architecture rtl of monpro2 is
     signal state, state_next : state_t := idle;
     
 begin
-    prod_288 <= std_logic_vector(unsigned(mul_A) * unsigned(mul_B));
-    tmp_prod <= unsigned(u0) * unsigned(n_prime);
-    prod_32  <= std_logic_vector(tmp_prod(31 downto 0));    
+    prod_288 <= std_logic_vector(unsigned(mul_A) * unsigned(mul_B));   
     r <= u(255 downto 0);
     
     process(state, start)    
@@ -86,7 +81,6 @@ begin
         
             when idle =>
                 u         <= (others => '0');
-                u0        <= (others => '0');
                 mul_A     <= (others => '0');
                 mul_B     <= (others => '0');
                 
@@ -114,13 +108,14 @@ begin
             when mult_u0np =>
                 busy <= '1';
                 done <= '0';
-                u0 <= u(31 downto 0);
+                mul_A <= u(31 downto 0);
+                mul_B <= (255 downto 32 => '0') & n_prime;
                 state_next <= mult_mn; 
                 
             when mult_mn =>
                 busy <= '1';
                 done <= '0';
-                mul_A <= prod_32;
+                mul_A <= prod_288(31 downto 0);
                 mul_B <= n;
                 state_next <= add_umn;
             
