@@ -55,24 +55,35 @@ architecture rtl of monpro2 is
 
     signal mul_A    : std_logic_vector(31 downto 0) := (others  => '0');
     signal mul_B    : std_logic_vector(255 downto 0) := (others  => '0');
-    signal prod_288 : std_logic_vector(287 downto 0) := (others  => '0');
+    signal p        : std_logic_vector(287 downto 0) := (others  => '0');
   
     signal i_idx    : integer range 0 to 7 := 0;
+    signal mult_sel : std_logic_vector(1 downto 0) := (others => '0');
     
     type state_t is (
         idle,
-        mult_AB, 
+        mult_AB_shift_u, 
         add_uAB, 
         mult_u0np, 
         mult_mn,
         add_umn,
-        shift_r32,
         final
         );
     signal state, state_next : state_t := idle;
     
 begin
-    prod_288 <= std_logic_vector(unsigned(mul_A) * unsigned(mul_B));   
+with mult_sel select
+  mul_A <= Ai      when "00",
+          u0      when "01",
+          m       when "10",
+          (others => '0') when others;
+
+with mult_sel select
+  mul_B <= B       when "00",
+          n_prime when "01",
+          n       when "10",
+          (others => '0') when others;
+    p <= std_logic_vector(unsigned(mul_A) * unsigned(mul_B));   
     r <= u(255 downto 0);
     
     process(state, start)    
@@ -87,22 +98,29 @@ begin
                 busy <= '0';
                 done <= '0';
                 if start = '1' then
-                    state_next <= mult_AB;
+                    state_next <= mult_AB_shift_u;
                 else
                     state_next <= idle;
                 end if;
                                 
-            when mult_AB =>
+            when mult_AB_shift_u =>
                 busy <= '1';
-                done <= '0';            
-                mul_A <= A(32*(i_idx+1) - 1 downto 32*i_idx);
-                mul_B <= B;
-                state_next <= add_uAB;
-            
+                done <= '0';        
+                u <= std_logic_vector(unsigned(u) srl 32);
+                if i_idx >= 8 then
+                    i_idx <= 0;
+                    state_next <= final;
+                else
+                   i_idx <= i_idx + 1;
+                   mul_A <= A(32*(i_idx+1) - 1 downto 32*i_idx);
+                   mul_B <= B;
+                   state_next <= add_uAB;
+               end if; 
+
             when add_uAB =>
                 busy <= '1';
                 done <= '0';
-                u <= std_logic_vector(unsigned(u) + unsigned(prod_288));
+                u <= std_logic_vector(unsigned(u) + unsigned(p));
                 state_next <= mult_u0np;
             
             when mult_u0np =>
@@ -115,30 +133,20 @@ begin
             when mult_mn =>
                 busy <= '1';
                 done <= '0';
-                mul_A <= prod_288(31 downto 0);
+                mul_A <= p(31 downto 0);
                 mul_B <= n;
                 state_next <= add_umn;
             
             when add_umn =>
                 busy <= '1';
                 done <= '0';
-                u <= std_logic_vector(unsigned(u) + unsigned(prod_288));
-                state_next <= shift_r32;
-             
-            when shift_r32 =>
-                busy <= '1';
-                done <= '0';
-                u <= std_logic_vector(unsigned(u) srl 32);
-                if i_idx >= 7 then
-                    i_idx <= 0;
-                    state_next <= final;
-                else
-                   i_idx <= i_idx + 1;
-                   state_next <= mult_AB;
-               end if; 
-               
+                u <= std_logic_vector(unsigned(u) + unsigned(p));
+                state_next <= mult_AB_shift_u;
+                           
             when final =>
-                done <= '1';  
+                done <= '1'; 
+                busy <= '0';  
+ 
                 state_next <= idle;          
         end case;
     end process;
