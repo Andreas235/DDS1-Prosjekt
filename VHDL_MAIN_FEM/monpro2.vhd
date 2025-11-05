@@ -51,110 +51,166 @@ entity monpro2 is
 end monpro2;
 
 architecture rtl of monpro2 is
-    signal u    : std_logic_vector(287 downto 0) := (others  => '0');
-
-    signal mul_A    : std_logic_vector(31 downto 0) := (others  => '0');
-    signal mul_B    : std_logic_vector(255 downto 0) := (others  => '0');
-    signal p        : std_logic_vector(287 downto 0) := (others  => '0');
-  
-    signal i_idx    : integer range 0 to 7 := 0;
-    signal mult_sel : std_logic_vector(1 downto 0) := (others => '0');
+    -- Registers
+    signal p     : std_logic_vector(287 downto 0) := (others  => '0');
+    signal u     : std_logic_vector(287 downto 0) := (others  => '0');
+    signal index    : integer range 0 to 7 := 0;
+    
+    -- Signals
+    signal index_op : std_logic_vector(1 downto 0) := (others => '0'); -- 00: Nothing, 01: Reset, 10: Increment
+    signal mult_sel : std_logic_vector(1 downto 0) := (others => '0'); -- 00: Nothing, 01: Ai*B,  10: u0*n_prime, 11: m*n
+    signal write_u : std_logic_vector(1 downto 0) := (others => '0');  -- 00: Nothing, 01: u+p,   10: >> 32
+    signal idle_reset : std_logic := '0';
     
     type state_t is (
         idle,
+        finished,
         mult_AB_shift_u, 
         add_uAB, 
         mult_u0np, 
         mult_mn,
         add_umn,
-        final
+        final_shift
         );
     signal state, state_next : state_t := idle;
     
 begin
-with mult_sel select
-  mul_A <= Ai      when "00",
-          u0      when "01",
-          m       when "10",
-          (others => '0') when others;
-
-with mult_sel select
-  mul_B <= B       when "00",
-          n_prime when "01",
-          n       when "10",
-          (others => '0') when others;
-    p <= std_logic_vector(unsigned(mul_A) * unsigned(mul_B));   
     r <= u(255 downto 0);
     
     process(state, start)    
     begin
         case state is
-        
             when idle =>
-                u         <= (others => '0');
-                mul_A     <= (others => '0');
-                mul_B     <= (others => '0');
-                
                 busy <= '0';
-                done <= '0';
+                done <= '0';     
+                mult_sel <= "00";   
+                write_u <= "10";
+                index_op <= "00";
+                idle_reset <= '1';
                 if start = '1' then
                     state_next <= mult_AB_shift_u;
                 else
                     state_next <= idle;
                 end if;
+                
+            when finished =>
+                busy <= '0';
+                done <= '1';
+                mult_sel <= "00"; 
+                write_u <= "00";  
+                idle_reset <= '0';
+                state_next <= idle;
                                 
             when mult_AB_shift_u =>
                 busy <= '1';
-                done <= '0';        
-                u <= std_logic_vector(unsigned(u) srl 32);
-                if i_idx >= 8 then
-                    i_idx <= 0;
-                    state_next <= final;
-                else
-                   i_idx <= i_idx + 1;
-                   mul_A <= A(32*(i_idx+1) - 1 downto 32*i_idx);
-                   mul_B <= B;
-                   state_next <= add_uAB;
-               end if; 
+                done <= '0';     
+                mult_sel <= "01";   
+                write_u <= "10";
+                index_op <= "00";
+                idle_reset <= '0';
+                state_next <= add_uAB;
 
             when add_uAB =>
                 busy <= '1';
                 done <= '0';
-                u <= std_logic_vector(unsigned(u) + unsigned(p));
-                state_next <= mult_u0np;
+                mult_sel <= "00";  
+                write_u <= "01";  
+                idle_reset <= '0';
+                index_op <= "00"; 
+                state_next <= mult_u0np; 
             
             when mult_u0np =>
                 busy <= '1';
                 done <= '0';
-                mul_A <= u(31 downto 0);
-                mul_B <= (255 downto 32 => '0') & n_prime;
+                mult_sel <= "10";
+                write_u <= "00";  
+                index_op <= "00"; 
+                idle_reset <= '0';
                 state_next <= mult_mn; 
                 
             when mult_mn =>
                 busy <= '1';
                 done <= '0';
-                mul_A <= p(31 downto 0);
-                mul_B <= n;
+                mult_sel <= "11";
+                write_u <= "00";  
+                index_op <= "00"; 
+                idle_reset <= '0';
                 state_next <= add_umn;
             
             when add_umn =>
                 busy <= '1';
                 done <= '0';
-                u <= std_logic_vector(unsigned(u) + unsigned(p));
-                state_next <= mult_AB_shift_u;
-                           
-            when final =>
-                done <= '1'; 
-                busy <= '0';  
- 
-                state_next <= idle;          
+                mult_sel <= "00";
+                write_u <= "01";  
+                idle_reset <= '0';
+                if index = 7 then
+                    index_op <= "01"; -- Reset
+                    state_next <= final_shift;
+                else
+                   index_op <= "10"; -- Inc
+                   state_next <= mult_AB_shift_u;
+               end if; 
+            
+            when final_shift =>
+                busy <= '1';
+                done <= '0';  
+                mult_sel <= "00";
+                write_u <= "10";  
+                idle_reset <= '0';                
+                index_op <= "00";  -- Nothing
+                idle_reset <= '0';
+                state_next <= finished;
+                                                              
         end case;
     end process;
     
 	update_state : process (clk)
 	begin
-		if (rising_edge(clk)) then
-			state <= state_next;
+        if (rising_edge(clk)) then
+            state <= state_next;
+                if reset = '0' then
+                    state <= idle;
+                end if;			
 		end if;
 	end process update_state;
+	
+	update_regs : process (clk)
+	begin
+        if (rising_edge(clk)) then
+            if reset = '0' or idle_reset = '1' then
+                p <= (others => '0');
+                u <= (others => '0');
+                index <= 0;
+            else             
+                case mult_sel is
+                    when "01" =>
+                        p <= std_logic_vector(unsigned(A(32*(index+1) - 1 downto 32*index)) * unsigned(B));
+                    when "10" =>
+                        p <= std_logic_vector(unsigned(u(31 downto 0)) * unsigned((255 downto 32 => '0') & n_prime));
+                    when "11" =>
+                        p <= std_logic_vector(unsigned(p(31 downto 0)) * unsigned(n));   
+                    when others =>
+                        p <= p;         
+                end case;
+                
+                case write_u is
+                    when "01" =>
+                        u <= std_logic_vector(unsigned(u) + unsigned(p));
+                    when "10" =>
+                        u <= std_logic_vector(unsigned(u) srl 32);
+                    when others =>
+                        u <= u;
+                end case;
+                
+                case index_op is
+                    when "01" =>
+                        index <= 0;
+                    when "10" =>
+                        index <= index + 1;
+                    when others =>
+                        index <= index;
+                end case;
+            end if;
+        end if;
+	end process update_regs;
 end rtl;
