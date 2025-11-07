@@ -1,0 +1,476 @@
+#-----------------------------------------------------------
+# Vivado v2024.1 (64-bit)
+# SW Build 5076996 on Wed May 22 18:37:14 MDT 2024
+# IP Build 5075265 on Wed May 22 21:45:21 MDT 2024
+# SharedData Build 5076995 on Wed May 22 18:29:18 MDT 2024
+# Start of session at: Fri Nov  7 13:58:54 2025
+# Process ID: 17216
+# Current directory: C:/Xilinx/Vivado/monpro/monpro.runs/synth_1
+# Command line: vivado.exe -log monpro5.vds -product Vivado -mode batch -messageDb vivado.pb -notrace -source monpro5.tcl
+# Log file: C:/Xilinx/Vivado/monpro/monpro.runs/synth_1/monpro5.vds
+# Journal file: C:/Xilinx/Vivado/monpro/monpro.runs/synth_1\vivado.jou
+# Running On        :LAB-PC
+# Platform          :Windows Server 2016 or Windows 10
+# Operating System  :19045
+# Processor Detail  :Intel(R) Xeon(R) CPU E3-1240 v5 @ 3.50GHz
+# CPU Frequency     :3504 MHz
+# CPU Physical cores:4
+# CPU Logical cores :8
+# Host memory       :34288 MB
+# Swap memory       :5100 MB
+# Total Virtual     :39388 MB
+# Available Virtual :23716 MB
+#-----------------------------------------------------------
+source monpro5.tcl -notrace
+create_project: Time (s): cpu = 00:00:08 ; elapsed = 00:00:08 . Memory (MB): peak = 491.730 ; gain = 200.371
+Command: read_checkpoint -auto_incremental -incremental C:/Xilinx/Vivado/monpro/monpro.srcs/utils_1/imports/synth_1/monpro.dcp
+INFO: [Vivado 12-5825] Read reference checkpoint from C:/Xilinx/Vivado/monpro/monpro.srcs/utils_1/imports/synth_1/monpro.dcp for incremental synthesis
+INFO: [Vivado 12-7989] Please ensure there are no constraint changes
+Command: synth_design -top monpro5 -part xc7z020clg400-1 -directive PerformanceOptimized -fsm_extraction one_hot -keep_equivalent_registers -resource_sharing off -no_lc -shreg_min_size 5
+Starting synth_design
+Attempting to get a license for feature 'Synthesis' and/or device 'xc7z020'
+INFO: [Common 17-349] Got license for feature 'Synthesis' and/or device 'xc7z020'
+INFO: [Device 21-403] Loading part xc7z020clg400-1
+INFO: [Device 21-9227] Part: xc7z020clg400-1 does not have CEAM library.
+INFO: [Designutils 20-5440] No compile time benefit to using incremental synthesis; A full resynthesis will be run
+INFO: [Designutils 20-4379] Flow is switching to default flow due to incremental criteria not met. If you would like to alter this behaviour and have the flow terminate instead, please set the following parameter config_implementation {autoIncr.Synth.RejectBehavior Terminate}
+INFO: [Synth 8-7079] Multithreading enabled for synth_design using a maximum of 2 processes.
+INFO: [Synth 8-7078] Launching helper process for spawning children vivado processes
+INFO: [Synth 8-7075] Helper process launched with PID 9612
+---------------------------------------------------------------------------------
+Starting RTL Elaboration : Time (s): cpu = 00:00:07 ; elapsed = 00:00:07 . Memory (MB): peak = 1374.539 ; gain = 447.738
+---------------------------------------------------------------------------------
+INFO: [Synth 8-638] synthesizing module 'monpro5' [C:/Xilinx/Vivado/monpro/monpro.srcs/sources_1/new/monpro5.vhd:53]
+WARNING: [Synth 8-614] signal 'index' is read in the process but is not in the sensitivity list [C:/Xilinx/Vivado/monpro/monpro.srcs/sources_1/new/monpro5.vhd:152]
+INFO: [Synth 8-256] done synthesizing module 'monpro5' (0#1) [C:/Xilinx/Vivado/monpro/monpro.srcs/sources_1/new/monpro5.vhd:53]
+---------------------------------------------------------------------------------
+Finished RTL Elaboration : Time (s): cpu = 00:00:09 ; elapsed = 00:00:09 . Memory (MB): peak = 1488.379 ; gain = 561.578
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Handling Custom Attributes
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Handling Custom Attributes : Time (s): cpu = 00:00:09 ; elapsed = 00:00:09 . Memory (MB): peak = 1488.379 ; gain = 561.578
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished RTL Optimization Phase 1 : Time (s): cpu = 00:00:09 ; elapsed = 00:00:09 . Memory (MB): peak = 1488.379 ; gain = 561.578
+---------------------------------------------------------------------------------
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.023 . Memory (MB): peak = 1488.379 ; gain = 0.000
+INFO: [Project 1-570] Preparing netlist for logic optimization
+
+Processing XDC Constraints
+Initializing timing engine
+Parsing XDC File [C:/Xilinx/Vivado/monpro/monpro.srcs/constrs_1/new/clock_const.xdc]
+WARNING: [Vivado 12-584] No ports matched 'reset_n'. [C:/Xilinx/Vivado/monpro/monpro.srcs/constrs_1/new/clock_const.xdc:5]
+CRITICAL WARNING: [Vivado 12-4739] set_false_path:No valid object(s) found for '-from [get_ports reset_n]'. [C:/Xilinx/Vivado/monpro/monpro.srcs/constrs_1/new/clock_const.xdc:5]
+Resolution: Check if the specified object(s) exists in the current design. If it does, ensure that the correct design hierarchy was specified for the object. If you are working with clocks, make sure create_clock was used to create the clock object before it is referenced.
+WARNING: [Vivado 12-584] No ports matched 'a[*]'. [C:/Xilinx/Vivado/monpro/monpro.srcs/constrs_1/new/clock_const.xdc:8]
+WARNING: [Vivado 12-584] No ports matched 'b[*]'. [C:/Xilinx/Vivado/monpro/monpro.srcs/constrs_1/new/clock_const.xdc:8]
+Finished Parsing XDC File [C:/Xilinx/Vivado/monpro/monpro.srcs/constrs_1/new/clock_const.xdc]
+Completed Processing XDC Constraints
+
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00 . Memory (MB): peak = 1573.453 ; gain = 0.000
+INFO: [Project 1-111] Unisim Transformation Summary:
+No Unisim elements were transformed.
+
+Constraint Validation Runtime : Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.012 . Memory (MB): peak = 1573.453 ; gain = 0.000
+INFO: [Designutils 20-5440] No compile time benefit to using incremental synthesis; A full resynthesis will be run
+INFO: [Designutils 20-4379] Flow is switching to default flow due to incremental criteria not met. If you would like to alter this behaviour and have the flow terminate instead, please set the following parameter config_implementation {autoIncr.Synth.RejectBehavior Terminate}
+---------------------------------------------------------------------------------
+Finished Constraint Validation : Time (s): cpu = 00:00:18 ; elapsed = 00:00:18 . Memory (MB): peak = 1573.453 ; gain = 646.652
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Loading Part and Timing Information
+---------------------------------------------------------------------------------
+Loading part: xc7z020clg400-1
+---------------------------------------------------------------------------------
+Finished Loading Part and Timing Information : Time (s): cpu = 00:00:18 ; elapsed = 00:00:18 . Memory (MB): peak = 1573.453 ; gain = 646.652
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Applying 'set_property' XDC Constraints
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished applying 'set_property' XDC Constraints : Time (s): cpu = 00:00:18 ; elapsed = 00:00:18 . Memory (MB): peak = 1573.453 ; gain = 646.652
+---------------------------------------------------------------------------------
+INFO: [Synth 8-802] inferred FSM for state register 'state_reg' in module 'monpro5'
+---------------------------------------------------------------------------------------------------
+                   State |                     New Encoding |                Previous Encoding 
+---------------------------------------------------------------------------------------------------
+                    idle |                           000001 |                              000
+                  step_1 |                           000010 |                              010
+                  step_2 |                           000100 |                              011
+                  step_3 |                           001000 |                              100
+                  step_4 |                           010000 |                              101
+                finished |                           100000 |                              001
+---------------------------------------------------------------------------------------------------
+INFO: [Synth 8-3354] encoded FSM with state register 'state_reg' using encoding 'one-hot' in module 'monpro5'
+---------------------------------------------------------------------------------
+Finished RTL Optimization Phase 2 : Time (s): cpu = 00:00:19 ; elapsed = 00:00:19 . Memory (MB): peak = 1573.453 ; gain = 646.652
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start RTL Component Statistics 
+---------------------------------------------------------------------------------
+Detailed RTL Component Info : 
++---Adders : 
+	   2 Input  288 Bit       Adders := 1     
+	   2 Input    3 Bit       Adders := 1     
++---Registers : 
+	              288 Bit    Registers := 1     
+	               32 Bit    Registers := 1     
+	                3 Bit    Registers := 1     
++---Multipliers : 
+	             32x256  Multipliers := 1     
++---Muxes : 
+	   3 Input  288 Bit        Muxes := 2     
+	   4 Input  256 Bit        Muxes := 1     
+	   4 Input   32 Bit        Muxes := 1     
+	   6 Input    6 Bit        Muxes := 1     
+	   2 Input    6 Bit        Muxes := 2     
+	   3 Input    3 Bit        Muxes := 1     
+	   2 Input    2 Bit        Muxes := 1     
+	   6 Input    2 Bit        Muxes := 6     
+	   3 Input    1 Bit        Muxes := 2     
+	   6 Input    1 Bit        Muxes := 1     
+	   5 Input    1 Bit        Muxes := 1     
+---------------------------------------------------------------------------------
+Finished RTL Component Statistics 
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Part Resource Summary
+---------------------------------------------------------------------------------
+Part Resources:
+DSPs: 220 (col length:60)
+BRAMs: 280 (col length: RAMB18 60 RAMB36 30)
+---------------------------------------------------------------------------------
+Finished Part Resource Summary
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Cross Boundary and Area Optimization
+---------------------------------------------------------------------------------
+WARNING: [Synth 8-7080] Parallel synthesis criteria is not met
+DSP Report: Generating DSP prod, operation Mode is: A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: (PCIN>>17)+A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: (PCIN>>17)+A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: PCIN+A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: (PCIN>>17)+A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: (PCIN>>17)+A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: PCIN+A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: (PCIN>>17)+A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: (PCIN>>17)+A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: PCIN+A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: (PCIN>>17)+A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: (PCIN>>17)+A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: PCIN+A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: (PCIN>>17)+A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: (PCIN>>17)+A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: PCIN+A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: (PCIN>>17)+A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: (PCIN>>17)+A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: PCIN+A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: (PCIN>>17)+A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: (PCIN>>17)+A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: PCIN+A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: Generating DSP prod, operation Mode is: (PCIN>>17)+A*B.
+DSP Report: operator prod is absorbed into DSP prod.
+DSP Report: operator prod is absorbed into DSP prod.
+---------------------------------------------------------------------------------
+Finished Cross Boundary and Area Optimization : Time (s): cpu = 00:00:29 ; elapsed = 00:00:29 . Memory (MB): peak = 1573.453 ; gain = 646.652
+---------------------------------------------------------------------------------
+ Sort Area is  prod_0 : 0 0 : 3101 12100 : Used 1 time 0
+ Sort Area is  prod_0 : 0 1 : 3120 12100 : Used 1 time 0
+ Sort Area is  prod_0 : 0 2 : 2759 12100 : Used 1 time 0
+ Sort Area is  prod_0 : 0 3 : 3120 12100 : Used 1 time 0
+ Sort Area is  prod_a : 0 0 : 2759 11827 : Used 1 time 0
+ Sort Area is  prod_a : 0 1 : 3120 11827 : Used 1 time 0
+ Sort Area is  prod_a : 0 2 : 2759 11827 : Used 1 time 0
+ Sort Area is  prod_a : 0 3 : 3189 11827 : Used 1 time 0
+ Sort Area is  prod_4 : 0 0 : 2759 11758 : Used 1 time 0
+ Sort Area is  prod_4 : 0 1 : 3120 11758 : Used 1 time 0
+ Sort Area is  prod_4 : 0 2 : 2759 11758 : Used 1 time 0
+ Sort Area is  prod_4 : 0 3 : 3120 11758 : Used 1 time 0
+ Sort Area is  prod_6 : 0 0 : 2759 11758 : Used 1 time 0
+ Sort Area is  prod_6 : 0 1 : 3120 11758 : Used 1 time 0
+ Sort Area is  prod_6 : 0 2 : 2759 11758 : Used 1 time 0
+ Sort Area is  prod_6 : 0 3 : 3120 11758 : Used 1 time 0
+ Sort Area is  prod_7 : 0 0 : 2759 11758 : Used 1 time 0
+ Sort Area is  prod_7 : 0 1 : 3120 11758 : Used 1 time 0
+ Sort Area is  prod_7 : 0 2 : 2759 11758 : Used 1 time 0
+ Sort Area is  prod_7 : 0 3 : 3120 11758 : Used 1 time 0
+ Sort Area is  prod_8 : 0 0 : 2759 11758 : Used 1 time 0
+ Sort Area is  prod_8 : 0 1 : 3120 11758 : Used 1 time 0
+ Sort Area is  prod_8 : 0 2 : 2759 11758 : Used 1 time 0
+ Sort Area is  prod_8 : 0 3 : 3120 11758 : Used 1 time 0
+ Sort Area is  prod_9 : 0 0 : 2759 11758 : Used 1 time 0
+ Sort Area is  prod_9 : 0 1 : 3120 11758 : Used 1 time 0
+ Sort Area is  prod_9 : 0 2 : 2759 11758 : Used 1 time 0
+ Sort Area is  prod_9 : 0 3 : 3120 11758 : Used 1 time 0
+ Sort Area is  prod_c : 0 0 : 2759 5594 : Used 1 time 0
+ Sort Area is  prod_c : 0 1 : 2835 5594 : Used 1 time 0
+---------------------------------------------------------------------------------
+Start ROM, RAM, DSP, Shift Register and Retiming Reporting
+---------------------------------------------------------------------------------
+
+DSP: Preliminary Mapping Report (see note below. The ' indicates corresponding REG is set)
++------------+----------------+--------+--------+--------+--------+--------+------+------+------+------+-------+------+------+
+|Module Name | DSP Mapping    | A Size | B Size | C Size | D Size | P Size | AREG | BREG | CREG | DREG | ADREG | MREG | PREG | 
++------------+----------------+--------+--------+--------+--------+--------+------+------+------+------+-------+------+------+
+|monpro5     | A*B            | 18     | 16     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | (PCIN>>17)+A*B | 19     | 16     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | A*B            | 18     | 16     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | (PCIN>>17)+A*B | 18     | 18     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN+A*B       | 18     | 16     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | (PCIN>>17)+A*B | 19     | 18     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | A*B            | 18     | 16     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | (PCIN>>17)+A*B | 18     | 18     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN+A*B       | 18     | 16     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | (PCIN>>17)+A*B | 18     | 18     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | A*B            | 18     | 16     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | (PCIN>>17)+A*B | 18     | 18     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN+A*B       | 18     | 16     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | (PCIN>>17)+A*B | 18     | 18     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | A*B            | 18     | 16     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | (PCIN>>17)+A*B | 18     | 18     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN+A*B       | 18     | 16     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | (PCIN>>17)+A*B | 18     | 18     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | A*B            | 18     | 16     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | (PCIN>>17)+A*B | 18     | 18     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN+A*B       | 18     | 16     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | (PCIN>>17)+A*B | 18     | 18     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | A*B            | 18     | 16     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | (PCIN>>17)+A*B | 18     | 18     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN+A*B       | 18     | 16     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | (PCIN>>17)+A*B | 18     | 18     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | A*B            | 18     | 18     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | (PCIN>>17)+A*B | 18     | 18     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN+A*B       | 18     | 16     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | (PCIN>>17)+A*B | 18     | 18     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
++------------+----------------+--------+--------+--------+--------+--------+------+------+------+------+-------+------+------+
+
+Note: The table above is a preliminary report that shows the DSPs inferred at the current stage of the synthesis flow. Some DSP may be reimplemented as non DSP primitives later in the synthesis flow. Multiple instantiated DSPs are reported only once.
+---------------------------------------------------------------------------------
+Finished ROM, RAM, DSP, Shift Register and Retiming Reporting
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Applying XDC Timing Constraints
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Applying XDC Timing Constraints : Time (s): cpu = 00:00:40 ; elapsed = 00:00:40 . Memory (MB): peak = 1573.453 ; gain = 646.652
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Timing Optimization
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Timing Optimization : Time (s): cpu = 00:00:57 ; elapsed = 00:00:57 . Memory (MB): peak = 1641.188 ; gain = 714.387
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Technology Mapping
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Technology Mapping : Time (s): cpu = 00:00:59 ; elapsed = 00:01:00 . Memory (MB): peak = 1641.238 ; gain = 714.438
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start IO Insertion
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Flattening Before IO Insertion
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Flattening Before IO Insertion
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Final Netlist Cleanup
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Final Netlist Cleanup
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished IO Insertion : Time (s): cpu = 00:01:05 ; elapsed = 00:01:05 . Memory (MB): peak = 1650.062 ; gain = 723.262
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Renaming Generated Instances
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Renaming Generated Instances : Time (s): cpu = 00:01:05 ; elapsed = 00:01:05 . Memory (MB): peak = 1650.062 ; gain = 723.262
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Rebuilding User Hierarchy
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Rebuilding User Hierarchy : Time (s): cpu = 00:01:05 ; elapsed = 00:01:06 . Memory (MB): peak = 1650.062 ; gain = 723.262
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Renaming Generated Ports
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Renaming Generated Ports : Time (s): cpu = 00:01:05 ; elapsed = 00:01:06 . Memory (MB): peak = 1650.062 ; gain = 723.262
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Handling Custom Attributes
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Handling Custom Attributes : Time (s): cpu = 00:01:05 ; elapsed = 00:01:06 . Memory (MB): peak = 1650.062 ; gain = 723.262
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Renaming Generated Nets
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Renaming Generated Nets : Time (s): cpu = 00:01:05 ; elapsed = 00:01:06 . Memory (MB): peak = 1650.062 ; gain = 723.262
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Writing Synthesis Report
+---------------------------------------------------------------------------------
+
+DSP Final Report (the ' indicates corresponding REG is set)
++------------+--------------+--------+--------+--------+--------+--------+------+------+------+------+-------+------+------+
+|Module Name | DSP Mapping  | A Size | B Size | C Size | D Size | P Size | AREG | BREG | CREG | DREG | ADREG | MREG | PREG | 
++------------+--------------+--------+--------+--------+--------+--------+------+------+------+------+-------+------+------+
+|monpro5     | A*B          | 17     | 15     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN>>17+A*B | 18     | 15     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | A*B          | 17     | 15     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN>>17+A*B | 17     | 17     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN+A*B     | 17     | 15     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN>>17+A*B | 18     | 17     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | A*B          | 17     | 15     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN>>17+A*B | 17     | 17     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN+A*B     | 17     | 15     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN>>17+A*B | 17     | 17     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | A*B          | 17     | 15     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN>>17+A*B | 17     | 17     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN+A*B     | 17     | 15     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN>>17+A*B | 17     | 17     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | A*B          | 17     | 15     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN>>17+A*B | 17     | 17     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN+A*B     | 17     | 15     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN>>17+A*B | 17     | 17     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | A*B          | 17     | 15     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN>>17+A*B | 17     | 17     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN+A*B     | 17     | 15     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN>>17+A*B | 17     | 17     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | A*B          | 17     | 15     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN>>17+A*B | 17     | 17     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN+A*B     | 17     | 15     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN>>17+A*B | 17     | 17     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | A*B          | 17     | 17     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN>>17+A*B | 17     | 17     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN+A*B     | 17     | 15     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
+|monpro5     | PCIN>>17+A*B | 17     | 17     | -      | -      | 48     | 0    | 0    | -    | -    | -     | 0    | 0    | 
++------------+--------------+--------+--------+--------+--------+--------+------+------+------+------+-------+------+------+
+
+
+Report BlackBoxes: 
++-+--------------+----------+
+| |BlackBox name |Instances |
++-+--------------+----------+
++-+--------------+----------+
+
+Report Cell Usage: 
++------+--------+------+
+|      |Cell    |Count |
++------+--------+------+
+|1     |BUFG    |     1|
+|2     |CARRY4  |   216|
+|3     |DSP48E1 |    30|
+|4     |LUT1    |     1|
+|5     |LUT2    |   237|
+|6     |LUT3    |   223|
+|7     |LUT4    |   132|
+|8     |LUT5    |   824|
+|9     |LUT6    |   714|
+|10    |MUXF7   |    32|
+|11    |FDRE    |   352|
+|12    |FDSE    |     1|
+|13    |IBUF    |   803|
+|14    |OBUF    |   258|
++------+--------+------+
+---------------------------------------------------------------------------------
+Finished Writing Synthesis Report : Time (s): cpu = 00:01:05 ; elapsed = 00:01:06 . Memory (MB): peak = 1650.062 ; gain = 723.262
+---------------------------------------------------------------------------------
+Synthesis finished with 0 errors, 0 critical warnings and 1 warnings.
+Synthesis Optimization Runtime : Time (s): cpu = 00:00:53 ; elapsed = 00:01:03 . Memory (MB): peak = 1650.062 ; gain = 638.188
+Synthesis Optimization Complete : Time (s): cpu = 00:01:05 ; elapsed = 00:01:06 . Memory (MB): peak = 1650.062 ; gain = 723.262
+INFO: [Project 1-571] Translating synthesized netlist
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.036 . Memory (MB): peak = 1656.941 ; gain = 0.000
+INFO: [Netlist 29-17] Analyzing 278 Unisim elements for replacement
+INFO: [Netlist 29-28] Unisim Transformation completed in 0 CPU seconds
+WARNING: [Netlist 29-101] Netlist 'monpro5' is not ideal for floorplanning, since the cellview 'monpro5' contains a large number of primitives.  Please consider enabling hierarchy in synthesis if you want to do floorplanning.
+INFO: [Project 1-570] Preparing netlist for logic optimization
+INFO: [Opt 31-138] Pushed 0 inverter(s) to 0 load pin(s).
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.001 . Memory (MB): peak = 1660.617 ; gain = 0.000
+INFO: [Project 1-111] Unisim Transformation Summary:
+No Unisim elements were transformed.
+
+Synth Design complete | Checksum: 146dbfbe
+INFO: [Common 17-83] Releasing license: Synthesis
+25 Infos, 6 Warnings, 1 Critical Warnings and 0 Errors encountered.
+synth_design completed successfully
+synth_design: Time (s): cpu = 00:01:13 ; elapsed = 00:01:59 . Memory (MB): peak = 1660.617 ; gain = 1162.543
+INFO: [runtcl-6] Synthesis results are not added to the cache due to CRITICAL_WARNING
+Write ShapeDB Complete: Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.018 . Memory (MB): peak = 1660.617 ; gain = 0.000
+INFO: [Common 17-1381] The checkpoint 'C:/Xilinx/Vivado/monpro/monpro.runs/synth_1/monpro5.dcp' has been generated.
+INFO: [Vivado 12-24828] Executing command : report_utilization -file monpro5_utilization_synth.rpt -pb monpro5_utilization_synth.pb
+INFO: [Common 17-206] Exiting Vivado at Fri Nov  7 14:01:04 2025...
