@@ -44,7 +44,10 @@ entity monpro5 is
     operand   : in  std_logic_vector(31 downto 0);
     n         : in  std_logic_vector(31 downto 0);
     n_prime   : in  std_logic_vector(31 downto 0); -- -n^{-1} mod 2^32
-    new_data  : in  std_logic_vector(1 downto 0)
+    new_data  : in  std_logic_vector(1 downto 0);
+    
+    r         : out std_logic_vector(31 downto 0)
+    
 );
 end monpro5;
 
@@ -54,10 +57,7 @@ architecture rtl of monpro5 is
     signal A_reg : std_logic_vector(255 downto 0) := (others  => '0');
     signal B_reg : std_logic_vector(255 downto 0) := (others  => '0');
     signal n_reg : std_logic_vector(255 downto 0) := (others  => '0');
-    
-    -- Output register
-    signal r     : std_logic_vector(255 downto 0) := (others  => '0');
-       
+           
     -- Datapath registers
     signal m        : std_logic_vector(31 downto 0)  := (others  => '0');
     signal u        : std_logic_vector(287 downto 0) := (others  => '0');
@@ -135,7 +135,8 @@ begin
     prod <= std_logic_vector(unsigned(mul_A) * unsigned(mul_B));
     sum  <= std_logic_vector(unsigned(add_1) + unsigned(prod));
     shifted_u <= std_logic_vector(unsigned(u) srl 32);
-    r <= u(255 downto 0);
+    
+    r <= u(31 downto 0);
     
     datapath_combinatorial : process(all)
     begin
