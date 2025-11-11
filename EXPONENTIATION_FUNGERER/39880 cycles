@@ -1,0 +1,9 @@
+Denne exponentiationen fungerer!
+Har testet med ca 3 ulike meldinger og verifisert med python-highlevel-kode.
+Stats:
+Klokkefrekvens: ca. 75MHz. Dette skyldes en 256-bit subtractor. Den må splittes i to, men det er null stress. Skal nok nå 88MHz etterpå.     
+Monpro_cycles = 122 per modular multiplications
+Totalt antall cycles fra melding går inn til resultat kommer ut: 39 880. Det er altså 1450 cycles mer enn monpro-cycles*number of mults: 315*122
+DSP-bruk 30. Ligger altså an til å få 7 kjerner.
+
+Plan videre. Få dette designet inn på FPGAen på onsdag. Jeg kan se på pipelining.
