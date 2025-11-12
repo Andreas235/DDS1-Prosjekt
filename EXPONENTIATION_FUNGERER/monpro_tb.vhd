@@ -68,6 +68,25 @@ architecture tb of monpro_tb is
   -- Expected REDC/CIOS result: (a*b*R^{-1}) mod n
   constant C_EXPECTED_R3 : std_logic_vector(KW-1 downto 0) :=
     x"36a81b92cefd052f965595c5cb6085ba765d6f566cfd73e7a9ee32402780580c";
+    
+  constant C_A4 : std_logic_vector(KW-1 downto 0) :=
+    x"d3c0c4fde53251c7334c40ec2db83c8f96b02d537354dd0b5841300efdef2772";
+  constant C_B4 : std_logic_vector(KW-1 downto 0) :=
+    x"21dc6c91f35e30246dbf7412fee3a0448e875bcdedd0b59c5ec75af92437bb47";
+
+  -- Expected REDC/CIOS result: (a*b*R^{-1}) mod n
+  constant C_EXPECTED_R4 : std_logic_vector(KW-1 downto 0) :=
+    x"41cb3a792201748ceb52667412f6785af0be06a0753df2393c7f187378e4220f";    
+    
+    
+  constant C_A5 : std_logic_vector(KW-1 downto 0) :=
+    x"33bfccddb9d2a87445441a84eaa6a2445a60f3c778b8cccd86c927fc8d4e7660";
+  constant C_B5 : std_logic_vector(KW-1 downto 0) :=
+    x"e9538590d7c40b0fa414134993ba9baeb9f5004d5c924fbc309065607dbdde5b";
+
+  -- Expected REDC/CIOS result: (a*b*R^{-1}) mod n
+  constant C_EXPECTED_R5 : std_logic_vector(KW-1 downto 0) :=
+    x"2a161917c0df0c80b529a8a23eadb6aa635cf4ece4cf3c44326a3bb702e20696";       
 
   --------------------------------------------------------------------
   -- Helper: std_logic_vector → HEX string (VHDL-93 friendly)
@@ -124,22 +143,38 @@ begin
     reset_n <= '1';
     wait for 2*CLK_PERIOD;
 
+    wait until rising_edge(clk);
+    
+    start <= '1';
+    wait for CLK_PERIOD;
     -- Drive inputs
     a       <= C_A1;
     b       <= C_B1;
     n       <= C_N;
     n_prime <= C_N_PRIME;
-
+    
     -- Pulse start
-    wait until rising_edge(clk);
-    start <= '1';
-    wait until rising_edge(clk);
+    wait for CLK_PERIOD;
     start <= '0';
+    a       <= C_A2;
+    b       <= C_B2;
+
+    wait for CLK_PERIOD;
+    a       <= C_A3;
+    b       <= C_B3;
+    
+    wait for CLK_PERIOD;
+    a       <= C_A4;
+    b       <= C_B4;
+    
+    wait for CLK_PERIOD;
+    a       <= C_A5;
+    b       <= C_B5;        
 
     -- Count cycles until done
     cycles := 0;
     loop
-      wait until rising_edge(clk);
+    wait for CLK_PERIOD;
       cycles := cycles + 1;
       exit when done = '1';
     end loop;
@@ -157,7 +192,8 @@ begin
     else
       report "FAIL: MonPro output mismatch." severity error;
     end if;
-            
+         
+    wait for 5*CLK_PERIOD;
     -- Drive inputs
     a       <= C_A2;
     b       <= C_B2;
@@ -165,9 +201,9 @@ begin
     n_prime <= C_N_PRIME;
 
     -- Pulse start
-    wait until rising_edge(clk);
+    wait for 2*CLK_PERIOD;
     start <= '1';
-    wait until rising_edge(clk);
+    wait for 2*CLK_PERIOD;
     start <= '0';
 
     -- Count cycles until done

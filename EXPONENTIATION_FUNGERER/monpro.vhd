@@ -86,7 +86,7 @@ architecture rtl of monpro is
     signal U_reg       : std_logic_vector(287 downto 0) := (others  => '0');
     
     -- After loop
-    signal end_buffer  : std_logic_vector(1279 downto 0) := (others => '0');
+    signal output_buffer  : std_logic_vector(1279 downto 0) := (others => '0');
     signal U2_reg      : std_logic_vector(255 downto 0) := (others  => '0');
     signal U_sub_lo    : std_logic_vector(128 downto 0) := (others  => '0');
     signal r_reg       : std_logic_vector(255 downto 0) := (others  => '0');
@@ -97,6 +97,7 @@ architecture rtl of monpro is
     signal r_is_U_minus_n : std_logic := '0';
 
     -- Other
+    signal write_output_buffer       : std_logic := '0';
     signal write_U2       : std_logic := '0';
     signal write_U_sub_lo : std_logic := '0';   
     signal write_r        : std_logic := '0';    
@@ -139,12 +140,14 @@ architecture rtl of monpro is
         add_3_2,
         write_U_3,
         -- End of main loop
+        load_buffer,
         output_stage_1,
         output_stage_2,
         finished
     );
     signal state, state_next : state_t := idle;
     signal index    : integer range 0 to 7 := 0;
+    signal buffercounter    : integer range 0 to 5 := 0;
 begin
     r <= r_reg;
     fsm : process(state, start)    
@@ -156,6 +159,7 @@ begin
         monpro_step <= none;
         index_op    <= hold;
         -- Result regs
+        
         write_U2        <= '0';
         write_U_sub_lo  <= '0';      
         write_r         <= '0';
@@ -227,7 +231,17 @@ begin
             -- End of main loop
             
             -- After 8 iterations of main loop          
+            when load_buffer =>       busy <= '1'; monpro_step <= mn;
+                if buffercounter /= 5 then
+                    state_next <= output_stage_1;
+                else
+                    write_output_buffer <= '1';  
+                    buffercounter <= buffercounter + 1;
+                    state_next    <= load_buffer;
+                end if;
+                
             when output_stage_1 => busy <= '1';
+                buffercounter <= 0;
                 write_U_sub_lo <= '1'; write_U2 <= '1';
                 if unsigned(U_reg) >= unsigned(n) then
                     r_is_U_minus_n <= '1';
@@ -240,9 +254,14 @@ begin
                 write_r <= '1';    
                 state_next <= finished;
 
-            when finished =>
+            when finished => busy <= '1';
                 done       <= '1';
-                state_next <= idle;
+                if buffercounter = 5 then
+                    state_next <= idle;
+                else
+                    state_next <= output_stage_1;
+                    buffercounter <= buffercounter + 1;
+                end if;             
         end case;
     end process fsm;    
                                    
@@ -369,6 +388,9 @@ begin
                 end if;
                 
                 -- Write result pipeline in two stages. Split 256 subtractor.
+                if write_output_buffer then
+                    output_buffer <= output_buffer(1023 downto 0) & U_reg;
+                end if;
                 -- Output stage 1
                 if write_U_sub_lo = '1' and write_U2 = '1' then
                     -- Res_lo[129-bit] = U_lo[129-bit] - n_lo[129-bit] : 129 bit subtractor to capture the borrow-bit
