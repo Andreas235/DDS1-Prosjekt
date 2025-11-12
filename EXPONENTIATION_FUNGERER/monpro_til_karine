@@ -228,15 +228,15 @@ begin
             -- After 8 iterations of main loop          
             when output_stage_1 => busy <= '1';
                 write_U_sub_lo <= '1'; write_U2 <= '1';
-                state_next <= output_stage_2;
-                          
-            when output_stage_2 => busy <= '1';
-                write_r <= '1';
                 if unsigned(U_reg) >= unsigned(n) then
                     r_is_U_minus_n <= '1';
                 else
                     r_is_U_minus_n <= '0';
-                end if;      
+                end if;                  
+                state_next <= output_stage_2;
+                          
+            when output_stage_2 => busy <= '1';
+                write_r <= '1';    
                 state_next <= finished;
 
             when finished =>
