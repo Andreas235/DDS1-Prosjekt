@@ -61,27 +61,27 @@ architecture rtl of monpro is
     signal operand_2   : std_logic_vector(255 downto 0)   := (others  => '0');
     
     --Pipeline stage 2
-    signal A_S2        : std_logic_vector(255 downto 0)  := (others  => '0');
-    signal B_S2        : std_logic_vector(255 downto 0)  := (others  => '0');
-    signal U_S2        : std_logic_vector(287 downto 0)  := (others  => '0');
-    signal P_reg       : std_logic_vector(287 downto 0)  := (others  => '0');
+    signal A_S2        : std_logic_vector(255 downto 0) := (others  => '0');
+    signal B_S2        : std_logic_vector(255 downto 0) := (others  => '0');
+    signal U_S2        : std_logic_vector(287 downto 0) := (others  => '0');
+    signal P_reg       : std_logic_vector(287 downto 0) := (others  => '0');
     
     --Pipeline stage 3
-    signal A_S3        : std_logic_vector(255 downto 0)  := (others  => '0');
-    signal B_S3        : std_logic_vector(255 downto 0)  := (others  => '0');
-    signal U_S3        : std_logic_vector(287 downto 0)  := (others  => '0');    
+    signal A_S3        : std_logic_vector(255 downto 0) := (others  => '0');
+    signal B_S3        : std_logic_vector(255 downto 0) := (others  => '0');
+    signal U_S3        : std_logic_vector(287 downto 0) := (others  => '0');    
     signal P_S3        : std_logic_vector(287 downto 0) := (others  => '0');
     signal sum_LO      : std_logic_vector(287 downto 0) := (others  => '0');
     
     -- Pipeline stage 4
-    signal A_S4        : std_logic_vector(255 downto 0)  := (others  => '0');
-    signal B_S4        : std_logic_vector(255 downto 0)  := (others  => '0');
-    signal U_S4        : std_logic_vector(287 downto 0)  := (others  => '0');       
-    signal MAC_reg     : std_logic_vector(288 downto 0)  := (others  => '0');
+    signal A_S4        : std_logic_vector(255 downto 0) := (others  => '0');
+    signal B_S4        : std_logic_vector(255 downto 0) := (others  => '0');
+    signal U_S4        : std_logic_vector(287 downto 0) := (others  => '0');       
+    signal MAC_reg     : std_logic_vector(288 downto 0) := (others  => '0');
     
     -- Pipeline stage 5
-    signal A_S5        : std_logic_vector(255 downto 0)  := (others  => '0');
-    signal B_S5        : std_logic_vector(255 downto 0)  := (others  => '0');    
+    signal A_S5        : std_logic_vector(255 downto 0) := (others  => '0');
+    signal B_S5        : std_logic_vector(255 downto 0) := (others  => '0');    
     signal M_reg       : std_logic_vector(31 downto 0)  := (others  => '0');
     signal U_reg       : std_logic_vector(287 downto 0) := (others  => '0');
     
@@ -93,7 +93,6 @@ architecture rtl of monpro is
     -- Control signals
     signal index_op       : std_logic_vector(1 downto 0) := (others => '0'); -- 00: Nothing, 01: Reset, 10: Increment
     signal monpro_step    : std_logic_vector(1 downto 0) := (others => '0'); -- 00: None, 01: U := Ai*B + U,  10: M := u0*n_prime, 11: U := (M*n + U) >> 32
-    signal input_AB_mux   : std_logic := '0';
     signal r_is_U_minus_n : std_logic := '0';
 
     -- Other
@@ -159,7 +158,6 @@ begin
         write_U2        <= '0';
         write_U_sub_lo  <= '0';      
         write_r         <= '0';
-                
         reset_regs      <= '0';
         state_next      <= state;
                
@@ -176,48 +174,48 @@ begin
             when load_operands_1 => busy <= '1'; monpro_step <= AiB;
                 state_next  <= mul_1;
                 
-            when mul_1 => busy <= '1'; monpro_step <= AiB;
+            when mul_1 =>           busy <= '1'; monpro_step <= AiB;
                 state_next  <= add_1_1;
            
-            when add_1_1 => busy <= '1'; monpro_step <= AiB;
+            when add_1_1 =>         busy <= '1'; monpro_step <= AiB;
                 state_next <= add_1_2;
                                 
-            when add_1_2 => busy <= '1'; monpro_step <= AiB;
+            when add_1_2 =>         busy <= '1'; monpro_step <= AiB;
                 state_next <= write_U_1;
 
-            when write_U_1 => busy <= '1'; monpro_step <= AiB;
+            when write_U_1 =>       busy <= '1'; monpro_step <= AiB;
                 state_next <= load_operands_2;
                 
             -- Step 2 M := U0 * N_prime                                  
             when load_operands_2 => busy <= '1'; monpro_step <= u0np;
                 state_next  <= mul_2;
                 
-            when mul_2 => busy <= '1'; monpro_step <= u0np;
+            when mul_2 =>           busy <= '1'; monpro_step <= u0np;
                 state_next  <= add_2_1;
                 
-            when add_2_1 => busy <= '1'; monpro_step <= u0np;
+            when add_2_1 =>         busy <= '1'; monpro_step <= u0np;
                 state_next <= add_2_2;
                                 
-            when add_2_2 => busy <= '1'; monpro_step <= u0np;
+            when add_2_2 =>         busy <= '1'; monpro_step <= u0np;
                 state_next <= write_U_2;
              
-            when write_U_2 => busy <= '1'; monpro_step <= u0np;
+            when write_U_2 =>       busy <= '1'; monpro_step <= u0np;
                 state_next <= load_operands_3;                
                 
             -- Step 3 U := (M*n + U) >> 32 
             when load_operands_3 => busy <= '1'; monpro_step <= mn;
                 state_next  <= mul_3;
                 
-            when mul_3 => busy <= '1'; monpro_step <= mn;
+            when mul_3 =>           busy <= '1'; monpro_step <= mn;
                 state_next  <= add_3_1;
                 
-            when add_3_1 => busy <= '1'; monpro_step <= mn;
+            when add_3_1 =>         busy <= '1'; monpro_step <= mn;
                 state_next <= add_3_2;
                                 
-            when add_3_2 => busy <= '1'; monpro_step <= mn;
+            when add_3_2 =>         busy <= '1'; monpro_step <= mn;
                 state_next <= write_U_3;
                 
-            when write_U_3 => busy <= '1'; monpro_step <= mn;
+            when write_U_3 =>       busy <= '1'; monpro_step <= mn;
                 if index = 7 then
                     index_op   <= zero;
                     state_next <= output_stage_1;
@@ -258,6 +256,8 @@ begin
 	end process update_state;
 	
 	update_regs : process (clk)
+	variable operand_1_A : std_logic_vector(31 downto 0) := (others => '0');
+	variable operand_2_B : std_logic_vector(255 downto 0) := (others => '0');
 	begin
         if (rising_edge(clk)) then
             if reset_n = '0' or reset_regs = '1' then
@@ -276,19 +276,19 @@ begin
                 A_S3      <= (others => '0');
                 B_S3      <= (others => '0');
                 U_S3      <= (others => '0');
-                U_S3     <= (others => '0');                   
-                P_S3     <= (others => '0');
-                sum_LO     <= (others => '0');
+                U_S3      <= (others => '0');                   
+                P_S3      <= (others => '0');
+                sum_LO    <= (others => '0');
                 -- Pipeline stage 4
                 A_S4      <= (others => '0');
                 B_S4      <= (others => '0');
                 U_S4      <= (others => '0');                
-                MAC_reg    <= (others => '0');
+                MAC_reg   <= (others => '0');
                 -- Pipeline stage 5
                 A_S5      <= (others => '0');
                 B_S5      <= (others => '0');                
-                M_reg      <= (others => '0');
-                U_reg      <= (others => '0');
+                M_reg     <= (others => '0');
+                U_reg     <= (others => '0');
                 -- Other
                 U2_reg     <= (others => '0');
                 U_sub_lo   <= (others => '0');                
@@ -296,58 +296,76 @@ begin
                 index      <= 0;
             else     
                 -- Pipeline stage 1: Fetch operands
-                if input_AB_mux = external_AB then
+                if index = 0 then
                     A_S1 <= A;
                     B_S1 <= B;
-                    operand_1 <= A(32*(index+1) - 1 downto 32*index);
-                    operand_2 <= B;
+                    operand_1_A := A(32*(index+1) - 1 downto 32*index);
+                    operand_2_B := B;
                 else
                     A_S1 <= A_S5;
                     B_S1 <= B_S5;   
-                    operand_1 <= A_S5(32*(index+1) - 1 downto 32*index);
-                    operand_2 <= B_S5;                     
+                    operand_1_A := A_S5(32*(index+1) - 1 downto 32*index);
+                    operand_2_B := B_S5;                     
                 end if;
-                            
+                U_S1 <= U_reg;
+                
+                if monpro_step = AiB then
+                    operand_1 <= operand_1_A;
+                    operand_2 <= operand_2_B;
+                elsif monpro_step = u0np then
+                    operand_1 <= U_reg(31 downto 0);
+                    operand_2 <= (255 downto 32 => '0') & n_prime;
+                elsif monpro_step = mn then
+                    operand_1 <= M_reg;
+                    operand_2 <= n;
+                else
+                    operand_1 <= operand_1_A;
+                    operand_2 <= operand_2_B;                    
+                end if;
+                
                 -- Pipeline stage 2: 32 x 256 multiplicator
-                if write_P = '1' then
-                    P_reg <= std_logic_vector(unsigned(A_S1) * unsigned(B_reg));
-                end if;                  
-                if write_C2 = '1' then
-                    C2_reg <= C_reg;
-                end if;   
+                A_S2 <= A_S1;
+                B_S2 <= B_S1;
+                U_S2 <= U_S1;
                 
+                P_reg <= std_logic_vector(unsigned(operand_1) * unsigned(operand_2));
+
                 -- Pipeline stage 3: 288-bit adder split into two 144-bit adders: Add stage 1.
-                if write_P2 = '1' then
-                    P2_reg <= P_reg;
-                end if;  
-                if write_C3 = '1' then
-                    C3_reg <= C2_reg;
-                end if; 
-                
-                if add_U_or_zero = add_U then
-                    sum_LO <= std_logic_vector(resize(unsigned(P_reg(143 downto 0)), 288) + resize(unsigned(C2_reg(143 downto 0)), 288));
-                elsif add_U_or_zero = add_zero then
+                A_S3 <= A_S2;
+                B_S3 <= B_S2;
+                U_S3 <= U_S2;
+                P_S3 <= P_reg;
+                                
+                if monpro_step = AiB or monpro_step = mn then
+                    sum_LO <= std_logic_vector(resize(unsigned(P_reg(143 downto 0)), 288) + resize(unsigned(U_S2(143 downto 0)), 288));
+                else
                     sum_LO <= std_logic_vector(resize(unsigned(P_reg(143 downto 0)), 288));
                 end if; 
                 
                 -- Pipeline stage 4: 288-bit adder split into two 144-bit adders: Add stage 2.
+                A_S4 <= A_S3;
+                B_S4 <= B_S3;
+                U_S4 <= U_S3;
                 
-                if write_MAC = '1' then
-                    MAC_reg(288 downto 144)  <= std_logic_vector(resize(unsigned(P2_reg(287 downto 144)), 145) + resize(unsigned(C3_reg(287 downto 144)), 145) + resize(unsigned(sum_LO(144 downto 144)), 145));
+                if monpro_step = AiB or monpro_step = mn then
+                    MAC_reg(288 downto 144)  <= std_logic_vector(resize(unsigned(P_S3(287 downto 144)), 145) + resize(unsigned(U_S3(287 downto 144)), 145) + resize(unsigned(sum_LO(144 downto 144)), 145));
                     MAC_reg(143 downto 0)    <= sum_LO(143 downto 0);
+                else
+                    Mac_reg <= '0' & P_S3;
                 end if;
                 
                 -- Pipeline stage 5: Write accumulator/m-result
-                if write_U = current_MAC then
+                A_S5 <= A_S4;
+                B_S5 <= B_S4;
+                
+                if monpro_step = AiB then
                     U_reg <= MAC_reg(287 downto 0);
-                elsif write_U = shifted_MAC then
+                elsif monpro_step = mn then
                     U_reg <= (30 downto 0 => '0') & MAC_reg(288 downto 32);
                 else
-                    U_reg <= U_reg;
-                end if;
-                if write_M = '1' then
+                    U_reg <= U_S4;
                     M_reg <= MAC_reg(31 downto 0);
-                end if;                
+                end if;
                 
                 -- Write result pipeline in two stages. Split 256 subtractor.
                 -- Output stage 1
