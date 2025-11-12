@@ -285,7 +285,7 @@ begin
   -----------------------------------------------------------------------------
   -- Clock/reset
   -----------------------------------------------------------------------------
-  clk_gen: process begin clk <= '1'; wait for 6 ns; clk <= '0'; wait for 6 ns; end process;
+  clk_gen: process begin clk <= '1'; wait for 1 ns; clk <= '0'; wait for 1 ns; end process;
   reset_gen: process begin reset_n <= '0'; wait for 20 ns; reset_n <= '1'; wait; end process;
 
   -----------------------------------------------------------------------------
@@ -386,7 +386,7 @@ begin
               else
                 msgin_valid <= '1';
                 read_input_message(input_message);
-                msgin_data <= swap_words32_256(input_message);
+                msgin_data <= input_message;
                 report "DRIVE NEW MSGIN_DATA[" & stdvec_to_string(std_logic_vector(msgin_counter)) & "] RTL: " & stdvec_to_string(input_message);
                 msgin_last  <= msgin_counter(1);
                 msgin_counter <= msgin_counter + 1;
@@ -439,16 +439,16 @@ begin
               read_output_message(expected_msgout_data);
 
               -- normalize DUT output for compare (try A: 32-bit word swap)
-              dut_norm := swap_words32_256(msgout_data);
+              dut_norm := msgout_data;
 
               -- helpful print uses the normalized value
               report "COMPARE MSGOUT_DATA[" & stdvec_to_string(std_logic_vector(msgout_counter)) &
-                    "] DUT(norm) = " & stdvec_to_string(dut_norm) &
+                    "] DUT = " & stdvec_to_string(dut_norm) &
                     "   EXPECTED = " & stdvec_to_string(expected_msgout_data);
 
               -- single assert on the normalized value
               assert dut_norm = expected_msgout_data
-              report "Output message differs from expected result (after word-swap normalization)"
+              report "Output message differs from expected result"
               severity Failure;
 
               assert msgout_counter(1) = msgout_last

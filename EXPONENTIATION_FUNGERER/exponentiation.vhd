@@ -5,7 +5,7 @@ use ieee.numeric_std.all;
 entity exponentiation is
   generic (
     C_block_size : integer := 256;
-    DEBUG        : boolean := true
+    DEBUG        : boolean := false
   );
   port (
     -- input control
@@ -45,17 +45,21 @@ architecture rtl of exponentiation is
   constant K : integer := C_block_size / W;
 
   component monpro
+    --generic (
+      --W : integer := 32; -- word size
+      --K : integer := 8   -- number of limbs (256/W)
+    --);
     port (
       clk       : in  std_logic;
-      reset_n   : in  std_logic;
+      reset     : in  std_logic;
       start     : in  std_logic;
       busy      : out std_logic;
       done      : out std_logic;
-      a         : in  std_logic_vector(K*W-1 downto 0);
-      b         : in  std_logic_vector(K*W-1 downto 0);
-      n         : in  std_logic_vector(K*W-1 downto 0);
+      A         : in  std_logic_vector(255 downto 0);
+      B         : in  std_logic_vector(255 downto 0);
+      n         : in  std_logic_vector(255 downto 0);
       n_prime   : in  std_logic_vector(31 downto 0);
-      r         : out std_logic_vector(K*W-1 downto 0)
+      r         : out std_logic_vector(255 downto 0)
     );
   end component;
 
@@ -78,13 +82,14 @@ architecture rtl of exponentiation is
 
   type state_t is (
     S_IDLE,
-    S_LATCH,
+    --S_LATCH,
     S_TO_MONT_A, S_WAIT_TO_MONT_A,
     S_TO_MONT_ONE,
     S_A2,
     S_A3,
     S_GEN_ODD, S_WAIT_ODD,
     S_LOAD_VLNW,
+    S_VLNW_ARM,
     S_WAIT_OP,
     S_OP_SQ, S_OP_MUL,   -- LAUNCH states
     S_WAIT_MP,           -- waits for mp_done after any launch
@@ -129,8 +134,21 @@ architecture rtl of exponentiation is
   signal tbl_sel              : std_logic_vector(C_block_size-1 downto 0); -- latched tbl(idx)
   signal last_op              : std_logic_vector(1 downto 0) := "00";      -- remembers op for post-print
 
-  signal obs_sq  : integer := 0;
-  signal obs_mul : integer := 0;
+  signal obs_sq    : integer := 0;
+  signal obs_mul   : integer := 0;
+  signal obs_total : integer := 0;  -- alle MonPro-kall (inkl. precompute + to/from Mont)
+  
+  -- declarations
+  signal message_r  : std_logic_vector(C_block_size-1 downto 0);
+  signal key_r      : std_logic_vector(C_block_size-1 downto 0);
+  signal r2_mod_n_r : std_logic_vector(C_block_size-1 downto 0);
+  signal n_prime_r  : std_logic_vector(31 downto 0);
+  signal modulus_r  : std_logic_vector(C_block_size-1 downto 0);
+  
+  -- add latched schedules
+  signal vlnw_schedule_0_r : std_logic_vector(255 downto 0);
+  signal vlnw_schedule_1_r : std_logic_vector(255 downto 0);
+  signal vlnw_schedule_2_r : std_logic_vector(255 downto 0);
 
   function vlnw_code_to_index(c : std_logic_vector(3 downto 0)) return integer is
   begin
@@ -179,16 +197,17 @@ begin
   result    <= result_r;
 
   u_monpro : monpro
+    --generic map ( W => W, K => K )
     port map (
       clk       => clk,
-      reset_n   => reset_n,
+      reset     => reset_n,
       start     => mp_start,
       busy      => mp_busy,
       done      => mp_done,
       a         => a_in,
       b         => b_in,
       n         => n_reg,
-      n_prime   => n_prime,
+      n_prime   => n_prime_r,     -- CHANGED: was n_prime
       r         => mp_r
     );
 
@@ -198,10 +217,10 @@ begin
       reset               => not reset_n,
       load                => vlnw_load,
       monpro_done         => mp_done,
-      vlnw_schedule_0     => vlnw_schedule_0,
-      vlnw_schedule_1     => vlnw_schedule_1,
-      vlnw_schedule_2     => vlnw_schedule_2,
       read_precompute_adr => vlnw_addr,
+      vlnw_schedule_0     => vlnw_schedule_0_r,
+      vlnw_schedule_1     => vlnw_schedule_1_r,
+      vlnw_schedule_2     => vlnw_schedule_2_r,
       done                => vlnw_done,
       monpro_op           => vlnw_op
     );
@@ -224,6 +243,8 @@ begin
       acc         <= (others => '0');
       oneM        <= (others => '0');
       A2          <= (others => '0');
+      
+       
       for i in 0 to 7 loop
         tbl(i) <= (others => '0');
       end loop;
@@ -235,30 +256,54 @@ begin
       mul_addr_latched <= (others => '0');
       mul_idx_reg   <= 0;
       last_op       <= "00";
-      obs_sq        <= 0;
-      obs_mul       <= 0;
+      obs_sq      <= 0;
+      obs_mul     <= 0;
+      obs_total   <= 0;
+      
+      -- NEW: clear latched inputs
+      message_r     <= (others => '0');
+      key_r         <= (others => '0');
+      r2_mod_n_r    <= (others => '0');
+      n_prime_r     <= (others => '0');
+      modulus_r     <= (others => '0');
+      
+      vlnw_schedule_0_r <= (others => '0');
+      vlnw_schedule_1_r <= (others => '0');
+      vlnw_schedule_2_r <= (others => '0');
 
     elsif rising_edge(clk) then
       mp_start  <= '0';
       vlnw_load <= '0';
+      
+      if mp_done = '1' then
+        obs_total <= obs_total + 1;
+      end if;
 
       case st is
         when S_IDLE =>
           valid_out_r <= '0';
           ready_in_r  <= '1';
           if valid_in = '1' and ready_in_r = '1' then
-            ready_in_r <= '0';
-            st         <= S_LATCH;
-          end if;
+            -- LATCH EVERYTHING AT THE TRANSFER EDGE
+            message_r  <= message;
+            key_r      <= key;
+            r2_mod_n_r <= r2_mod_n;
+            n_prime_r  <= n_prime;
+            modulus_r  <= modulus;
+            -- NEW: latch schedules too
+            vlnw_schedule_0_r <= vlnw_schedule_0;
+            vlnw_schedule_1_r <= vlnw_schedule_1;
+            vlnw_schedule_2_r <= vlnw_schedule_2;
 
-        when S_LATCH =>
-          n_reg <= modulus;
-          st    <= S_TO_MONT_A;
+            ready_in_r <= '0';
+            st         <= S_TO_MONT_A;     -- CHANGED: skip S_LATCH
+          end if;
 
         -- toMont(A) = MonPro(A, R^2 mod n)
         when S_TO_MONT_A =>
-          a_in     <= message;
-          b_in     <= r2_mod_n;
+          n_reg    <= modulus_r;         -- CHANGED: use latched modulus
+          a_in     <= message_r;         -- CHANGED: use latched message
+          b_in     <= r2_mod_n_r;        -- CHANGED: use latched R^2 mod n
           mp_start <= '1';
           st       <= S_WAIT_TO_MONT_A;
 
@@ -268,10 +313,9 @@ begin
             if DEBUG then
               report "toMont(A): A_M=0x" & slv_to_hex(mp_r) severity note;
             end if;
-
-            -- toMont(1) = MonPro(1, R^2 mod n), LSW-first '1'
+            -- toMont(1) = MonPro(1, R^2 mod n)
             a_in     <= (others => '0'); a_in(0) <= '1';
-            b_in     <= r2_mod_n;
+            b_in     <= r2_mod_n_r;      -- CHANGED: use latched R^2 mod n
             mp_start <= '1';
             st       <= S_TO_MONT_ONE;
           end if;
@@ -338,8 +382,16 @@ begin
 
         when S_LOAD_VLNW =>
           acc       <= oneM;     -- start from 1_M
-          vlnw_load <= '1';
-          st        <= S_WAIT_OP;
+          vlnw_load <= '1';      -- pulse load
+          -- Sanity: done should not be high here, but if it is, we'll wait in S_VLNW_ARM
+          st        <= S_VLNW_ARM;
+
+        -- NEW: arm VLNW, wait until controller has cleared its 'done'
+        when S_VLNW_ARM =>
+         -- stay here until the controller deasserts 'done' after the load
+          if vlnw_done = '0' then
+            st <= S_WAIT_OP;
+          end if;
 
         when S_WAIT_OP =>
           if DEBUG then
@@ -412,16 +464,24 @@ begin
         when S_WAIT_MP =>
           if mp_done = '1' then
             acc <= mp_r;
+
+            -- TELL alltid
+            if last_op = "01" then
+              obs_sq  <= obs_sq + 1;   -- squaring
+            elsif last_op = "10" then
+              obs_mul <= obs_mul + 1;  -- multiply
+            end if;
+
+            -- LOGG kun om DEBUG=true
             if DEBUG then
               if last_op = "01" then
-                obs_sq <= obs_sq + 1;
                 report "after SQUARE: acc=0x" & slv_to_hex(mp_r) severity note;
               elsif last_op = "10" then
-                obs_mul <= obs_mul + 1;
                 report "after MULT (idx=" & integer'image(mul_idx_reg) &
                        "): acc=0x" & slv_to_hex(mp_r) severity note;
               end if;
             end if;
+
             st <= S_CHECK_VLNW_DONE;
           end if;
 
@@ -440,6 +500,15 @@ begin
             result_r    <= mp_r;
             if DEBUG then
               report "fromMont: result=0x" & slv_to_hex(mp_r) severity note;
+
+              -- Sammendrag
+              report "MONPRO SUMMARY: squares="    & integer'image(obs_sq)  severity note;
+              report "MONPRO SUMMARY: multiplies=" & integer'image(obs_mul) severity note;
+              report "MONPRO SUMMARY: total="      & integer'image(obs_total) severity note;
+
+              -- (valgfritt) beregn precompute/konverteringer = total - (sq + mul)
+              report "MONPRO SUMMARY: precomp+conv (toMont/fromMont/precompute) = "
+                     & integer'image(obs_total - (obs_sq + obs_mul)) severity note;
             end if;
             valid_out_r <= '1';
             st          <= S_OUT;
