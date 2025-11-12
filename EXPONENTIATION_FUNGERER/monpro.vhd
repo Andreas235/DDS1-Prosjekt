@@ -86,6 +86,7 @@ architecture rtl of monpro is
     signal U_reg       : std_logic_vector(287 downto 0) := (others  => '0');
     
     -- After loop
+    signal end_buffer  : std_logic_vector(1279 downto 0) := (others => '0');
     signal U2_reg      : std_logic_vector(255 downto 0) := (others  => '0');
     signal U_sub_lo    : std_logic_vector(128 downto 0) := (others  => '0');
     signal r_reg       : std_logic_vector(255 downto 0) := (others  => '0');
@@ -296,7 +297,7 @@ begin
                 index      <= 0;
             else     
                 -- Pipeline stage 1: Fetch operands
-                if index = 0 then
+                if index = 0 and monpro_step = AiB then
                     A_S1 <= A;
                     B_S1 <= B;
                     operand_1_A := A(32*(index+1) - 1 downto 32*index);
