@@ -41,31 +41,24 @@ architecture tb of monpro_tb is
     x"99925173AD65686715385EA800CD28120288FC70A9BC98DD4C90D676F8FF768D";
   constant C_N_PRIME : std_logic_vector(31 downto 0) := x"8833C3BB"; -- 2285093819
 
-  constant C_A2 : std_logic_vector(KW-1 downto 0) :=
-    x"150d69cbcd04a2eba06ed0efd0183603ad5662ebf4dbc96f87a03d93643c35f0";
-  constant C_B2 : std_logic_vector(KW-1 downto 0) :=
-    x"038d882148c1d21a0983141322c900c0a702f60165aac0efdb88016de7ec9e05";
-
-  -- Expected REDC/CIOS result: (a*b*R^{-1}) mod n
-  constant C_EXPECTED_R2 : std_logic_vector(KW-1 downto 0) :=
-    x"36df0b1309e2c3459d3abeaa294e370d8b12f0d7cd56e3664a9bf22f1699f19e";
-
-
   constant C_A1 : std_logic_vector(KW-1 downto 0) :=
     x"7b2c2cff3781db07b42ff01e242a6cfe7ef25a57c9491d84cb72a139c3897b63";
   constant C_B1 : std_logic_vector(KW-1 downto 0) :=
     x"f89aec4f5d4fab3f990d9124b40120839f8e068c36f94daf6cbd33e0955a2211";
-
-  -- Expected REDC/CIOS result: (a*b*R^{-1}) mod n
   constant C_EXPECTED_R1 : std_logic_vector(KW-1 downto 0) :=
     x"2d9b33e33aba4fb7fd9dda7e04f91bb8110aa9a7fe4fa5e5f1a2dcbb3e681a25";
+
+  constant C_A2 : std_logic_vector(KW-1 downto 0) :=
+    x"150d69cbcd04a2eba06ed0efd0183603ad5662ebf4dbc96f87a03d93643c35f0";
+  constant C_B2 : std_logic_vector(KW-1 downto 0) :=
+    x"038d882148c1d21a0983141322c900c0a702f60165aac0efdb88016de7ec9e05";
+  constant C_EXPECTED_R2 : std_logic_vector(KW-1 downto 0) :=
+    x"36df0b1309e2c3459d3abeaa294e370d8b12f0d7cd56e3664a9bf22f1699f19e";
 
   constant C_A3 : std_logic_vector(KW-1 downto 0) :=
     x"4223d53d1a5f333321a4d30c9f741e13196f6fe8192c3f34bf077c6eed84a050";
   constant C_B3 : std_logic_vector(KW-1 downto 0) :=
     x"5a54577a1235f50c7091bd263dc274f72c0ec94e73cc40562e41dacd377f5161";
-
-  -- Expected REDC/CIOS result: (a*b*R^{-1}) mod n
   constant C_EXPECTED_R3 : std_logic_vector(KW-1 downto 0) :=
     x"36a81b92cefd052f965595c5cb6085ba765d6f566cfd73e7a9ee32402780580c";
     
@@ -73,18 +66,13 @@ architecture tb of monpro_tb is
     x"d3c0c4fde53251c7334c40ec2db83c8f96b02d537354dd0b5841300efdef2772";
   constant C_B4 : std_logic_vector(KW-1 downto 0) :=
     x"21dc6c91f35e30246dbf7412fee3a0448e875bcdedd0b59c5ec75af92437bb47";
-
-  -- Expected REDC/CIOS result: (a*b*R^{-1}) mod n
   constant C_EXPECTED_R4 : std_logic_vector(KW-1 downto 0) :=
     x"41cb3a792201748ceb52667412f6785af0be06a0753df2393c7f187378e4220f";    
-    
     
   constant C_A5 : std_logic_vector(KW-1 downto 0) :=
     x"33bfccddb9d2a87445441a84eaa6a2445a60f3c778b8cccd86c927fc8d4e7660";
   constant C_B5 : std_logic_vector(KW-1 downto 0) :=
     x"e9538590d7c40b0fa414134993ba9baeb9f5004d5c924fbc309065607dbdde5b";
-
-  -- Expected REDC/CIOS result: (a*b*R^{-1}) mod n
   constant C_EXPECTED_R5 : std_logic_vector(KW-1 downto 0) :=
     x"2a161917c0df0c80b529a8a23eadb6aa635cf4ece4cf3c44326a3bb702e20696";       
 
@@ -145,17 +133,17 @@ begin
 
     wait until rising_edge(clk);
     
+    cycles := 0;
     start <= '1';
     wait for CLK_PERIOD;
+    start <= '0';
     -- Drive inputs
     a       <= C_A1;
     b       <= C_B1;
     n       <= C_N;
     n_prime <= C_N_PRIME;
     
-    -- Pulse start
     wait for CLK_PERIOD;
-    start <= '0';
     a       <= C_A2;
     b       <= C_B2;
 
@@ -171,8 +159,8 @@ begin
     a       <= C_A5;
     b       <= C_B5;        
 
+    cycles := 5;
     -- Count cycles until done
-    cycles := 0;
     loop
     wait for CLK_PERIOD;
       cycles := cycles + 1;
@@ -180,83 +168,129 @@ begin
     end loop;
     
     
-
-    -- Always print the DUT result and expected
     report "MonPro DONE in " & integer'image(cycles) & " cycles.";
     report "  r   = 0x" & to_hex(r);
     report "  exp = 0x" & to_hex(C_EXPECTED_R1);
-
-    -- PASS / FAIL print
     if r = C_EXPECTED_R1 then
       report "PASS: MonPro output matches expected.";
     else
       report "FAIL: MonPro output mismatch." severity error;
     end if;
-         
-    wait for 5*CLK_PERIOD;
-    -- Drive inputs
-    a       <= C_A2;
-    b       <= C_B2;
-    n       <= C_N;
-    n_prime <= C_N_PRIME;
-
-    -- Pulse start
-    wait for 2*CLK_PERIOD;
-    start <= '1';
-    wait for 2*CLK_PERIOD;
-    start <= '0';
-
-    -- Count cycles until done
-    cycles := 0;
-    loop
-      wait until rising_edge(clk);
-      cycles := cycles + 1;
-      exit when done = '1';
-    end loop;
     
-    -- Always print the DUT result and expected
+
+    
+    wait for CLK_PERIOD;
+    cycles := cycles + 1;
     report "MonPro DONE in " & integer'image(cycles) & " cycles.";
     report "  r   = 0x" & to_hex(r);
     report "  exp = 0x" & to_hex(C_EXPECTED_R2);
-
-    -- PASS / FAIL print
     if r = C_EXPECTED_R2 then
       report "PASS: MonPro output matches expected.";
     else
       report "FAIL: MonPro output mismatch." severity error;
-    end if;
-
-    -- Drive inputs
-    a       <= C_A3;
-    b       <= C_B3;
-    n       <= C_N;
-    n_prime <= C_N_PRIME;
-
-    -- Pulse start
-    wait until rising_edge(clk);
-    start <= '1';
-    wait until rising_edge(clk);
-    start <= '0';
-
-    -- Count cycles until done
-    cycles := 0;
-    loop
-      wait until rising_edge(clk);
-      cycles := cycles + 1;
-      exit when done = '1';
-    end loop;
+    end if;    
     
-    -- Always print the DUT result and expected
+    
+    wait for CLK_PERIOD;
+    cycles := cycles + 1;    
     report "MonPro DONE in " & integer'image(cycles) & " cycles.";
     report "  r   = 0x" & to_hex(r);
     report "  exp = 0x" & to_hex(C_EXPECTED_R3);
-
-    -- PASS / FAIL print
     if r = C_EXPECTED_R3 then
       report "PASS: MonPro output matches expected.";
     else
       report "FAIL: MonPro output mismatch." severity error;
-    end if;
+    end if;    
+    
+    
+    wait for CLK_PERIOD;
+    cycles := cycles + 1;    
+    report "MonPro DONE in " & integer'image(cycles) & " cycles.";
+    report "  r   = 0x" & to_hex(r);
+    report "  exp = 0x" & to_hex(C_EXPECTED_R4);
+    if r = C_EXPECTED_R4 then
+      report "PASS: MonPro output matches expected.";
+    else
+      report "FAIL: MonPro output mismatch." severity error;
+    end if;    
+    
+
+    wait for CLK_PERIOD;
+    cycles := cycles + 1;    
+    report "MonPro DONE in " & integer'image(cycles) & " cycles.";
+    report "  r   = 0x" & to_hex(r);
+    report "  exp = 0x" & to_hex(C_EXPECTED_R5);
+    if r = C_EXPECTED_R5 then
+      report "PASS: MonPro output matches expected.";
+    else
+      report "FAIL: MonPro output mismatch." severity error;
+    end if;        
+    
+         
+--    wait for 5*CLK_PERIOD;
+--    -- Drive inputs
+--    a       <= C_A2;
+--    b       <= C_B2;
+--    n       <= C_N;
+--    n_prime <= C_N_PRIME;
+
+--    -- Pulse start
+--    wait for 2*CLK_PERIOD;
+--    start <= '1';
+--    wait for 2*CLK_PERIOD;
+--    start <= '0';
+
+--    -- Count cycles until done
+--    cycles := 0;
+--    loop
+--      wait until rising_edge(clk);
+--      cycles := cycles + 1;
+--      exit when done = '1';
+--    end loop;
+    
+--    -- Always print the DUT result and expected
+--    report "MonPro DONE in " & integer'image(cycles) & " cycles.";
+--    report "  r   = 0x" & to_hex(r);
+--    report "  exp = 0x" & to_hex(C_EXPECTED_R2);
+
+--    -- PASS / FAIL print
+--    if r = C_EXPECTED_R2 then
+--      report "PASS: MonPro output matches expected.";
+--    else
+--      report "FAIL: MonPro output mismatch." severity error;
+--    end if;
+
+--    -- Drive inputs
+--    a       <= C_A3;
+--    b       <= C_B3;
+--    n       <= C_N;
+--    n_prime <= C_N_PRIME;
+
+--    -- Pulse start
+--    wait until rising_edge(clk);
+--    start <= '1';
+--    wait until rising_edge(clk);
+--    start <= '0';
+
+--    -- Count cycles until done
+--    cycles := 0;
+--    loop
+--      wait until rising_edge(clk);
+--      cycles := cycles + 1;
+--      exit when done = '1';
+--    end loop;
+    
+--    -- Always print the DUT result and expected
+--    report "MonPro DONE in " & integer'image(cycles) & " cycles.";
+--    report "  r   = 0x" & to_hex(r);
+--    report "  exp = 0x" & to_hex(C_EXPECTED_R3);
+
+--    -- PASS / FAIL print
+--    if r = C_EXPECTED_R3 then
+--      report "PASS: MonPro output matches expected.";
+--    else
+--      report "FAIL: MonPro output mismatch." severity error;
+--    end if;
 
     -- End sim
     wait for 10*CLK_PERIOD;

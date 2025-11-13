@@ -35,7 +35,7 @@ use ieee.numeric_std.all;
 entity monpro is
   port (
     clk       : in  std_logic;
-    reset_n     : in  std_logic;
+    reset_n   : in  std_logic;
     -- Control
     start     : in  std_logic;
     busy      : out std_logic;
@@ -86,7 +86,6 @@ architecture rtl of monpro is
     signal U_reg       : std_logic_vector(287 downto 0) := (others  => '0');
     
     -- After loop
-    signal output_buffer  : std_logic_vector(1279 downto 0) := (others => '0');
     signal U2_reg      : std_logic_vector(255 downto 0) := (others  => '0');
     signal U_sub_lo    : std_logic_vector(128 downto 0) := (others  => '0');
     signal r_reg       : std_logic_vector(255 downto 0) := (others  => '0');
@@ -94,6 +93,12 @@ architecture rtl of monpro is
     -- Control signals
     signal index_op       : std_logic_vector(1 downto 0) := (others => '0'); -- 00: Nothing, 01: Reset, 10: Increment
     signal monpro_step    : std_logic_vector(1 downto 0) := (others => '0'); -- 00: None, 01: U := Ai*B + U,  10: M := u0*n_prime, 11: U := (M*n + U) >> 32
+    signal monpro_step_S1 : std_logic_vector(1 downto 0) := (others => '0'); -- 00: None, 01: U := Ai*B + U,  10: M := u0*n_prime, 11: U := (M*n + U) >> 32
+    signal monpro_step_S2 : std_logic_vector(1 downto 0) := (others => '0'); -- 00: None, 01: U := Ai*B + U,  10: M := u0*n_prime, 11: U := (M*n + U) >> 32
+    signal monpro_step_S3 : std_logic_vector(1 downto 0) := (others => '0'); -- 00: None, 01: U := Ai*B + U,  10: M := u0*n_prime, 11: U := (M*n + U) >> 32
+    signal monpro_step_S4 : std_logic_vector(1 downto 0) := (others => '0'); -- 00: None, 01: U := Ai*B + U,  10: M := u0*n_prime, 11: U := (M*n + U) >> 32
+    signal monpro_step_S5 : std_logic_vector(1 downto 0) := (others => '0'); -- 00: None, 01: U := Ai*B + U,  10: M := u0*n_prime, 11: U := (M*n + U) >> 32
+   
     signal r_is_U_minus_n : std_logic := '0';
 
     -- Other
@@ -140,23 +145,32 @@ architecture rtl of monpro is
         add_3_2,
         write_U_3,
         -- End of main loop
-        load_buffer,
         output_stage_1,
         output_stage_2,
+        write_output_1,
+        write_output_2,
+        write_output_3,
+        write_output_4,
         finished
-    );
+);
     signal state, state_next : state_t := idle;
     signal index    : integer range 0 to 7 := 0;
-    signal buffercounter    : integer range 0 to 5 := 0;
 begin
     r <= r_reg;
-    fsm : process(state, start)    
+    
+    fsm : process(state, start)
+    variable output_counter : integer range 0 to 5 := 0;
     begin
         -- Output signals
         busy        <= '0';
         done        <= '0';
         -- Control signals
         monpro_step <= none;
+        monpro_step_S1 <= none;
+        monpro_step_S2 <= none;
+        monpro_step_S3 <= none;
+        monpro_step_S4 <= none;
+        monpro_step_S5 <= none;         
         index_op    <= hold;
         -- Result regs
         
@@ -174,53 +188,159 @@ begin
                 else
                     state_next <= idle;
                 end if;
-            
+                            
             -- Step 1 U := Ai * B                                  
-            when load_operands_1 => busy <= '1'; monpro_step <= AiB;
-                state_next  <= mul_1;
-                
-            when mul_1 =>           busy <= '1'; monpro_step <= AiB;
-                state_next  <= add_1_1;
+            when load_operands_1 => busy <= '1'; monpro_step    <= AiB;
+                if index = 0 then
+                    monpro_step_S1 <= AiB;
+                    monpro_step_S2 <= none;
+                    monpro_step_S3 <= none;
+                    monpro_step_S4 <= none;
+                    monpro_step_S5 <= none;                    
+                else 
+                    monpro_step_S1 <= AiB;
+                    monpro_step_S2 <= mn;
+                    monpro_step_S3 <= mn;
+                    monpro_step_S4 <= mn;
+                    monpro_step_S5 <= mn;
+                end if;            
+                 state_next  <= mul_1;
+             when mul_1 =>           busy <= '1'; monpro_step    <= AiB;
+                if index = 0 then
+                    monpro_step_S1 <= AiB;
+                    monpro_step_S2 <= AiB;
+                    monpro_step_S3 <= none;
+                    monpro_step_S4 <= none;
+                    monpro_step_S5 <= none;                    
+                else 
+                    monpro_step_S1 <= AiB;
+                    monpro_step_S2 <= AiB;
+                    monpro_step_S3 <= mn;
+                    monpro_step_S4 <= mn;
+                    monpro_step_S5 <= mn;
+                end if;             
+                state_next  <= add_1_1;          
            
             when add_1_1 =>         busy <= '1'; monpro_step <= AiB;
+                if index = 0 then
+                    monpro_step_S1 <= AiB;
+                    monpro_step_S2 <= AiB;
+                    monpro_step_S3 <= AiB;
+                    monpro_step_S4 <= none;
+                    monpro_step_S5 <= none;                    
+                else 
+                    monpro_step_S1 <= AiB;
+                    monpro_step_S2 <= AiB;
+                    monpro_step_S3 <= AiB;
+                    monpro_step_S4 <= mn;
+                    monpro_step_S5 <= mn;
+                end if;               
                 state_next <= add_1_2;
                                 
             when add_1_2 =>         busy <= '1'; monpro_step <= AiB;
+                if index = 0 then
+                    monpro_step_S1 <= AiB;
+                    monpro_step_S2 <= AiB;
+                    monpro_step_S3 <= AiB;
+                    monpro_step_S4 <= AiB;
+                    monpro_step_S5 <= none;                    
+                else 
+                    monpro_step_S1 <= AiB;
+                    monpro_step_S2 <= AiB;
+                    monpro_step_S3 <= AiB;
+                    monpro_step_S4 <= AiB;
+                    monpro_step_S5 <= mn;
+                end if;                  
                 state_next <= write_U_1;
 
             when write_U_1 =>       busy <= '1'; monpro_step <= AiB;
+                monpro_step_S1 <= AiB;
+                monpro_step_S2 <= AiB;
+                monpro_step_S3 <= AiB;
+                monpro_step_S4 <= AiB;
+                monpro_step_S5 <= AiB;                    
                 state_next <= load_operands_2;
                 
             -- Step 2 M := U0 * N_prime                                  
             when load_operands_2 => busy <= '1'; monpro_step <= u0np;
+                monpro_step_S1 <= u0np;
+                monpro_step_S2 <= AiB;
+                monpro_step_S3 <= AiB;
+                monpro_step_S4 <= AiB;
+                monpro_step_S5 <= AiB;                
                 state_next  <= mul_2;
                 
             when mul_2 =>           busy <= '1'; monpro_step <= u0np;
+                monpro_step_S1 <= u0np;
+                monpro_step_S2 <= u0np;
+                monpro_step_S3 <= AiB;
+                monpro_step_S4 <= AiB;
+                monpro_step_S5 <= AiB;              
                 state_next  <= add_2_1;
                 
             when add_2_1 =>         busy <= '1'; monpro_step <= u0np;
+                monpro_step_S1 <= u0np;
+                monpro_step_S2 <= u0np;
+                monpro_step_S3 <= u0np;
+                monpro_step_S4 <= AiB;
+                monpro_step_S5 <= AiB;              
                 state_next <= add_2_2;
                                 
             when add_2_2 =>         busy <= '1'; monpro_step <= u0np;
+                monpro_step_S1 <= u0np;
+                monpro_step_S2 <= u0np;
+                monpro_step_S3 <= u0np;
+                monpro_step_S4 <= u0np;
+                monpro_step_S5 <= AiB;              
                 state_next <= write_U_2;
              
             when write_U_2 =>       busy <= '1'; monpro_step <= u0np;
+                monpro_step_S1 <= u0np;
+                monpro_step_S2 <= u0np;
+                monpro_step_S3 <= u0np;
+                monpro_step_S4 <= u0np;
+                monpro_step_S5 <= u0np;              
                 state_next <= load_operands_3;                
                 
             -- Step 3 U := (M*n + U) >> 32 
             when load_operands_3 => busy <= '1'; monpro_step <= mn;
+                monpro_step_S1 <= mn;
+                monpro_step_S2 <= u0np;
+                monpro_step_S3 <= u0np;
+                monpro_step_S4 <= u0np;
+                monpro_step_S5 <= u0np;                
                 state_next  <= mul_3;
                 
             when mul_3 =>           busy <= '1'; monpro_step <= mn;
+                monpro_step_S1 <= mn;
+                monpro_step_S2 <= mn;
+                monpro_step_S3 <= u0np;
+                monpro_step_S4 <= u0np;
+                monpro_step_S5 <= u0np;                   
                 state_next  <= add_3_1;
                 
             when add_3_1 =>         busy <= '1'; monpro_step <= mn;
+                monpro_step_S1 <= mn;
+                monpro_step_S2 <= mn;
+                monpro_step_S3 <= mn;
+                monpro_step_S4 <= u0np;
+                monpro_step_S5 <= u0np;                   
                 state_next <= add_3_2;
                                 
             when add_3_2 =>         busy <= '1'; monpro_step <= mn;
+                monpro_step_S1 <= mn;
+                monpro_step_S2 <= mn;
+                monpro_step_S3 <= mn;
+                monpro_step_S4 <= mn;
+                monpro_step_S5 <= u0np;                   
                 state_next <= write_U_3;
                 
             when write_U_3 =>       busy <= '1'; monpro_step <= mn;
+                monpro_step_S1 <= mn;
+                monpro_step_S2 <= mn;
+                monpro_step_S3 <= mn;
+                monpro_step_S4 <= mn;
+                monpro_step_S5 <= mn;               
                 if index = 7 then
                     index_op   <= zero;
                     state_next <= output_stage_1;
@@ -230,38 +350,111 @@ begin
                end if;
             -- End of main loop
             
-            -- After 8 iterations of main loop          
-            when load_buffer =>       busy <= '1'; monpro_step <= mn;
-                if buffercounter /= 5 then
-                    state_next <= output_stage_1;
-                else
-                    write_output_buffer <= '1';  
-                    buffercounter <= buffercounter + 1;
-                    state_next    <= load_buffer;
-                end if;
-                
-            when output_stage_1 => busy <= '1';
-                buffercounter <= 0;
-                write_U_sub_lo <= '1'; write_U2 <= '1';
-                if unsigned(U_reg) >= unsigned(n) then
+            -- After 8 iterations of main loop                       
+            when output_stage_1 => busy <= '0';               
+                monpro_step_S1 <= AiB;
+                monpro_step_S2 <= mn;
+                monpro_step_S3 <= mn;
+                monpro_step_S4 <= mn;
+                monpro_step_S5 <= mn;              
+                write_U_sub_lo <= '1'; 
+                write_U2 <= '1';      
+                write_r <= '1';    
+                if unsigned(U2_reg) >= unsigned(n) then
                     r_is_U_minus_n <= '1';
                 else
                     r_is_U_minus_n <= '0';
                 end if;                  
                 state_next <= output_stage_2;
                           
-            when output_stage_2 => busy <= '1';
+            when output_stage_2 => busy <= '0';
+                monpro_step_S1 <= AiB;
+                monpro_step_S2 <= AiB;
+                monpro_step_S3 <= mn;
+                monpro_step_S4 <= mn;
+                monpro_step_S5 <= mn;              
+                write_U_sub_lo <= '1'; 
+                write_U2 <= '1';      
                 write_r <= '1';    
-                state_next <= finished;
-
-            when finished => busy <= '1';
-                done       <= '1';
-                if buffercounter = 5 then
-                    state_next <= idle;
+                if unsigned(U2_reg) >= unsigned(n) then
+                    r_is_U_minus_n <= '1';
                 else
-                    state_next <= output_stage_1;
-                    buffercounter <= buffercounter + 1;
-                end if;             
+                    r_is_U_minus_n <= '0';
+                end if;           
+                state_next <= write_output_1;
+               
+            when write_output_1 => busy <= '0';
+                done       <= '1';
+                monpro_step_S1 <= AiB;
+                monpro_step_S2 <= AiB;
+                monpro_step_S3 <= AiB;
+                monpro_step_S4 <= mn;
+                monpro_step_S5 <= mn;              
+                write_U_sub_lo <= '1'; 
+                write_U2 <= '1';      
+                write_r <= '1';    
+                if unsigned(U2_reg) >= unsigned(n) then
+                    r_is_U_minus_n <= '1';
+                else
+                    r_is_U_minus_n <= '0';
+                end if; 
+                state_next <= write_output_2;
+                
+            when write_output_2 => busy <= '0';
+                done       <= '1';
+                monpro_step_S1 <= AiB;
+                monpro_step_S2 <= AiB;
+                monpro_step_S3 <= AiB;
+                monpro_step_S4 <= AiB;
+                monpro_step_S5 <= mn;              
+                write_U_sub_lo <= '1'; 
+                write_U2 <= '1';      
+                write_r <= '1';    
+                if unsigned(U2_reg) >= unsigned(n) then
+                    r_is_U_minus_n <= '1';
+                else
+                    r_is_U_minus_n <= '0';
+                end if; 
+                state_next <= write_output_3;
+
+            when write_output_3 => busy <= '0';
+                done       <= '1';
+                monpro_step_S1 <= AiB;
+                monpro_step_S2 <= AiB;
+                monpro_step_S3 <= AiB;
+                monpro_step_S4 <= AiB;
+                monpro_step_S5 <= AiB;              
+                write_U_sub_lo <= '1'; 
+                write_U2 <= '1';      
+                write_r <= '1';    
+                if unsigned(U2_reg) >= unsigned(n) then
+                    r_is_U_minus_n <= '1';
+                else
+                    r_is_U_minus_n <= '0';
+                end if; 
+                state_next <= write_output_4;
+                
+            when write_output_4 => busy <= '0';
+                done       <= '1';
+                monpro_step_S1 <= AiB;
+                monpro_step_S2 <= AiB;
+                monpro_step_S3 <= AiB;
+                monpro_step_S4 <= AiB;
+                monpro_step_S5 <= AiB;              
+                write_U_sub_lo <= '1'; 
+                write_U2 <= '1';      
+                write_r <= '1';    
+                if unsigned(U2_reg) >= unsigned(n) then
+                    r_is_U_minus_n <= '1';
+                else
+                    r_is_U_minus_n <= '0';
+                end if; 
+                state_next <= finished;   
+            
+            when finished => busy <= '0';  
+                done       <= '1';
+                state_next <= idle;   
+                        
         end case;
     end process fsm;    
                                    
@@ -316,7 +509,7 @@ begin
                 index      <= 0;
             else     
                 -- Pipeline stage 1: Fetch operands
-                if index = 0 and monpro_step = AiB then
+                if index = 0 and monpro_step_S1 = AiB then
                     A_S1 <= A;
                     B_S1 <= B;
                     operand_1_A := A(32*(index+1) - 1 downto 32*index);
@@ -329,13 +522,13 @@ begin
                 end if;
                 U_S1 <= U_reg;
                 
-                if monpro_step = AiB then
+                if monpro_step_S1 = AiB then
                     operand_1 <= operand_1_A;
                     operand_2 <= operand_2_B;
-                elsif monpro_step = u0np then
+                elsif monpro_step_S1 = u0np then
                     operand_1 <= U_reg(31 downto 0);
                     operand_2 <= (255 downto 32 => '0') & n_prime;
-                elsif monpro_step = mn then
+                elsif monpro_step_S1 = mn then
                     operand_1 <= M_reg;
                     operand_2 <= n;
                 else
@@ -356,7 +549,7 @@ begin
                 U_S3 <= U_S2;
                 P_S3 <= P_reg;
                                 
-                if monpro_step = AiB or monpro_step = mn then
+                if monpro_step_S3 = AiB or monpro_step_S3 = mn then
                     sum_LO <= std_logic_vector(resize(unsigned(P_reg(143 downto 0)), 288) + resize(unsigned(U_S2(143 downto 0)), 288));
                 else
                     sum_LO <= std_logic_vector(resize(unsigned(P_reg(143 downto 0)), 288));
@@ -367,7 +560,7 @@ begin
                 B_S4 <= B_S3;
                 U_S4 <= U_S3;
                 
-                if monpro_step = AiB or monpro_step = mn then
+                if monpro_step_S4 = AiB or monpro_step_S4 = mn then
                     MAC_reg(288 downto 144)  <= std_logic_vector(resize(unsigned(P_S3(287 downto 144)), 145) + resize(unsigned(U_S3(287 downto 144)), 145) + resize(unsigned(sum_LO(144 downto 144)), 145));
                     MAC_reg(143 downto 0)    <= sum_LO(143 downto 0);
                 else
@@ -378,9 +571,9 @@ begin
                 A_S5 <= A_S4;
                 B_S5 <= B_S4;
                 
-                if monpro_step = AiB then
+                if monpro_step_S5 = AiB then
                     U_reg <= MAC_reg(287 downto 0);
-                elsif monpro_step = mn then
+                elsif monpro_step_S5 = mn then
                     U_reg <= (30 downto 0 => '0') & MAC_reg(288 downto 32);
                 else
                     U_reg <= U_S4;
@@ -388,9 +581,6 @@ begin
                 end if;
                 
                 -- Write result pipeline in two stages. Split 256 subtractor.
-                if write_output_buffer then
-                    output_buffer <= output_buffer(1023 downto 0) & U_reg;
-                end if;
                 -- Output stage 1
                 if write_U_sub_lo = '1' and write_U2 = '1' then
                     -- Res_lo[129-bit] = U_lo[129-bit] - n_lo[129-bit] : 129 bit subtractor to capture the borrow-bit
