@@ -1,6 +1,9 @@
 -- *****************************************************************************
--- Name:     rsa_accelerator_tb.vhd  (adapted for rsa_core + VLNW schedules)
--- Purpose:  Run only DECRYPTION tests (ct3..ct5) using schedule-driven core
+-- Name:     rsa_accelerator_tb.vhd
+-- Project:  TFE4141 Term project 2018
+-- Created:  03.10.04, 08.11.18
+-- Author:   Øystein Gjermundnes
+-- Purpose:  A small testbench for the rsa_core
 -- *****************************************************************************
 library ieee;
 use ieee.std_logic_1164.all;
@@ -13,488 +16,682 @@ use std.textio.all;
 entity rsa_accelerator_tb is
 end rsa_accelerator_tb;
 
+
 architecture struct of rsa_accelerator_tb is
-  -----------------------------------------------------------------------------
-  -- Constants
-  -----------------------------------------------------------------------------
-  constant C_BLOCK_SIZE       : integer := 256;
 
-  -- Folder: "short_test" or "long_test"
-  constant C_TESTCASE_FOLDER  : string  := "long_test";
+	-----------------------------------------------------------------------------
+	-- Constant declarations
+	-----------------------------------------------------------------------------
+	constant C_BLOCK_SIZE   : integer := 256;
 
-  -- Only run DECRYPTION testcases (ct3..ct5)
-  constant C_TEST_FIRST_ID    : integer := 3;  -- ct3
-  constant C_TEST_LAST_ID     : integer := 5;  -- ct5
+	-- RENAME this constant to "long_test" for more comprehensive tests
+	-- "short_test" for shorter tests
+	constant C_TESTCASE_FOLDER: string := "long_test";
 
-  -----------------------------------------------------------------------------
-  -- Montgomery / schedule constants (FILL IN!)
-    ---------------------------------------------------------------------------
-  -- Realistic constants (you can replace later)
-  -- n is 256-bit odd modulus; R = 2^256; R2 = R^2 mod n
-  -- n' = (-n^{-1}) mod 2^32 (depends only on n(31 downto 0); n must be odd)
-  ---------------------------------------------------------------------------
-  --constant MODULUS_C  : std_logic_vector(C_BLOCK-1 downto 0)
-    --:= x"99925173AD65686715385EA800CD28120288FC70A9BC98DD4C90D676F8FF768D";  --RIKTIG
+	-----------------------------------------------------------------------------
+	-- Clocks and reset
+	-----------------------------------------------------------------------------
+	signal clk              : std_logic;
+	signal reset_n          : std_logic;
 
-  --constant R2MODN_C   : std_logic_vector(C_BLOCK-1 downto 0)
-    --:= x"56DDF8B43061AD3DBCD1757244D1A19E2E8C849DDE4817E55BB29D1C20C06364"; --RIKTIG
+	-----------------------------------------------------------------------------
+	-- Slave msgin interface
+	-----------------------------------------------------------------------------
+	-- Message that will be sent out is valid
+	signal msgin_valid      : std_logic;
+	-- Slave ready to accept a new message
+	signal msgin_ready      : std_logic;
+	-- Message that will be sent out of the rsa_msgin module
+	signal msgin_data       : std_logic_vector(C_BLOCK_SIZE-1 downto 0);
+	-- Indicates boundary of last packet
+	signal msgin_last       : std_logic;
 
-  --constant NPRIME_C   : std_logic_vector(31 downto 0)
-    --:= x"8833C3BB"; --RIKTIG
+	-----------------------------------------------------------------------------
+	-- Master msgout interface
+	-----------------------------------------------------------------------------
+	-- Message that will be sent out is valid
+	signal msgout_valid    : std_logic;
+	-- Slave ready to accept a new message
+	signal msgout_ready    : std_logic;
+	-- Message that will be sent out of the rsa_msgin module
+	signal msgout_data     : std_logic_vector(C_BLOCK_SIZE-1 downto 0);
+	-- Indicates boundary of last packet
+	signal msgout_last     : std_logic;
 
-  --constant MESSAGE_C  : std_logic_vector(C_BLOCK-1 downto 0)
-    --:= x"47D69AAD3C674409759981524CE494FD331DBE831A4970E6D6AB58052FFF24D0"; --RIKTIG
+	-----------------------------------------------------------------------------
+	-- Interface to the register block
+	-----------------------------------------------------------------------------
+	signal key_e_d         : std_logic_vector(C_BLOCK_SIZE-1 downto 0);
+	signal key_n           : std_logic_vector(C_BLOCK_SIZE-1 downto 0);
+	signal r2_mod_n        : std_logic_vector(C_BLOCK_SIZE-1 downto 0);
+	signal n_prime         : std_logic_vector(31 downto 0);
+	signal vlnw_schedule_0 : std_logic_vector(C_BLOCK_SIZE-1 downto 0);
+	signal vlnw_schedule_1 : std_logic_vector(C_BLOCK_SIZE-1 downto 0);
+	signal vlnw_schedule_2 : std_logic_vector(C_BLOCK_SIZE-1 downto 0);
+	signal rsa_status      : std_logic_vector(31 downto 0);
 
-  ---------------------------------------------------------------------------
-  -- Your encoded schedule words (EXACT 256-bit binary strings; MSB-left)
-  ---------------------------------------------------------------------------
-  -- 0000 001
-  --constant SCHED0_BITS : std_logic_vector(255 downto 0) :=
-    --x"b6682f00b07782b04f5fb84202b7e189f8427e12c11b781780f00b02f03bfe00";
+	-----------------------------------------------------------------------------
+	-- Testcases
+	-- The folder with the tests (rsa_tests), must be placed in the working
+	-- directory.
+	-- The testcases are the same as the ones that will run on the PYNQ platform.
+	-- Simulation of the largest testcases will take a lot of time.
+	-----------------------------------------------------------------------------
+	file tc_inp: text;
+	file tc_otp: text;
 
-  --constant SCHED1_BITS : std_logic_vector(255 downto 0) :=
-    --x"dc2103340be7fc2780580bc2fc00d601ebc1341341341dc37a703705e9c31019";
-    
-  --constant SCHED2_BITS : std_logic_vector(255 downto 0) := 
-    --x"e7016fff02700000000000000000000000000000000000000000000000000000";
-  -----------------------------------------------------------------------------
-  constant R2_MOD_N_C : std_logic_vector(255 downto 0) :=
-    x"56DDF8B43061AD3DBCD1757244D1A19E2E8C849DDE4817E55BB29D1C20C06364";
+	-----------------------------------------------------------------------------
+	-- Procedure for opening a file with input vectors
+	-----------------------------------------------------------------------------
+	procedure open_tc_inp(testcase_id: in integer) is
+	begin
+		if(testcase_id=0)then
+			file_open(tc_inp, C_TESTCASE_FOLDER & ".inp_messages.hex_pt0_in.txt", read_mode);
+		elsif(testcase_id=1)then
+			file_open(tc_inp, C_TESTCASE_FOLDER & ".inp_messages.hex_pt1_in.txt", read_mode);
+		elsif(testcase_id=2)then
+			file_open(tc_inp, C_TESTCASE_FOLDER & ".inp_messages.hex_pt2_in.txt", read_mode);
+		elsif(testcase_id=3)then
+			file_open(tc_inp, C_TESTCASE_FOLDER & ".inp_messages.hex_ct3_in.txt", read_mode);
+		elsif(testcase_id=4)then
+			file_open(tc_inp, C_TESTCASE_FOLDER & ".inp_messages.hex_ct4_in.txt", read_mode);
+		elsif(testcase_id=5)then
+			file_open(tc_inp, C_TESTCASE_FOLDER & ".inp_messages.hex_ct5_in.txt", read_mode);
+		end if;
+	end open_tc_inp;
 
-  constant N_PRIME_C  : std_logic_vector(31 downto 0) :=
-    x"8833C3BB";
+	-----------------------------------------------------------------------------
+	-- Procedure for opening a file with output vectors
+	-----------------------------------------------------------------------------
+	procedure open_tc_otp(testcase_id: in integer) is
+	begin
+		if(testcase_id=0)then
+			file_open(tc_otp, C_TESTCASE_FOLDER & ".otp_messages.hex_ct0_out.txt", read_mode);
+		elsif(testcase_id=1)then
+			file_open(tc_otp, C_TESTCASE_FOLDER & ".otp_messages.hex_ct1_out.txt", read_mode);
+		elsif(testcase_id=2)then
+			file_open(tc_otp, C_TESTCASE_FOLDER & ".otp_messages.hex_ct2_out.txt", read_mode);
+		elsif(testcase_id=3)then
+			file_open(tc_otp, C_TESTCASE_FOLDER & ".otp_messages.hex_pt3_out.txt", read_mode);
+		elsif(testcase_id=4)then
+			file_open(tc_otp, C_TESTCASE_FOLDER & ".otp_messages.hex_pt4_out.txt", read_mode);
+		elsif(testcase_id=5)then
+			file_open(tc_otp, C_TESTCASE_FOLDER & ".otp_messages.hex_pt5_out.txt", read_mode);
+		end if;
+	end open_tc_otp;
 
-  -- Your decryption schedule (three 256-bit words)
-  constant VLNW0_C : std_logic_vector(255 downto 0) :=
-    x"b6682f00b07782b04f5fb84202b7e189f8427e12c11b781780f00b02f03bfe00";
-  constant VLNW1_C : std_logic_vector(255 downto 0) :=
-    x"dc2103340be7fc2780580bc2fc00d601ebc1341341341dc37a703705e9c31019";
-  constant VLNW2_C : std_logic_vector(255 downto 0) :=
-    x"e7016fff02700000000000000000000000000000000000000000000000000000";
+	-----------------------------------------------------------------------------
+	-- Function for converting from hex strings to std_logic_vector.
+	-----------------------------------------------------------------------------
+	function str_to_stdvec(inp: string) return std_logic_vector is
+		variable temp: std_logic_vector(4*inp'length-1 downto 0) := (others => 'X');
+		variable temp1 : std_logic_vector(3 downto 0);
+	begin
+		for i in inp'range loop
+			case inp(i) is
+				 when '0' =>	 temp1 := x"0";
+				 when '1' =>	 temp1 := x"1";
+				 when '2' =>	 temp1 := x"2";
+				 when '3' =>	 temp1 := x"3";
+				 when '4' =>	 temp1 := x"4";
+				 when '5' =>	 temp1 := x"5";
+				 when '6' =>	 temp1 := x"6";
+				 when '7' =>	 temp1 := x"7";
+				 when '8' =>	 temp1 := x"8";
+				 when '9' =>	 temp1 := x"9";
+				 when 'A'|'a' => temp1 := x"a";
+				 when 'B'|'b' => temp1 := x"b";
+				 when 'C'|'c' => temp1 := x"c";
+				 when 'D'|'d' => temp1 := x"d";
+				 when 'E'|'e' => temp1 := x"e";
+				 when 'F'|'f' => temp1 := x"f";
+				 when others =>  temp1 := "XXXX";
+			end case;
+			temp(4*(i-1)+3 downto 4*(i-1)) := temp1;
+		end loop;
+		return temp;
+	end function str_to_stdvec;
 
-  -----------------------------------------------------------------------------
-  -- Clocks and reset
-  -----------------------------------------------------------------------------
-  signal clk              : std_logic;
-  signal reset_n          : std_logic;
+	-----------------------------------------------------------------------------
+	-- Function for converting from std_logic_vector to a string.
+	-----------------------------------------------------------------------------
+	function stdvec_to_string ( a: std_logic_vector) return string is
+		variable b : string (a'length/4 downto 1) := (others => NUL);
+		variable nibble : std_logic_vector(3 downto 0);
+	begin
+		for i in b'length downto 1 loop
+			nibble := a(i*4-1 downto (i-1)*4);
+			case nibble is
+				when "0000" => b(i) := '0';
+				when "0001" => b(i) := '1';
+				when "0010" => b(i) := '2';
+				when "0011" => b(i) := '3';
+				when "0100" => b(i) := '4';
+				when "0101" => b(i) := '5';
+				when "0110" => b(i) := '6';
+				when "0111" => b(i) := '7';
+				when "1000" => b(i) := '8';
+				when "1001" => b(i) := '9';
+				when "1010" => b(i) := 'A';
+				when "1011" => b(i) := 'B';
+				when "1100" => b(i) := 'C';
+				when "1101" => b(i) := 'D';
+				when "1110" => b(i) := 'E';
+				when "1111" => b(i) := 'F';
+				when others => b(i) := 'X';
+			end case;
 
-  -----------------------------------------------------------------------------
-  -- Slave msgin interface
-  -----------------------------------------------------------------------------
-  signal msgin_valid      : std_logic;
-  signal msgin_ready      : std_logic;
-  signal msgin_data       : std_logic_vector(C_BLOCK_SIZE-1 downto 0);
-  signal msgin_last       : std_logic;
+		end loop;
+		return b;
+	end function;
 
-  -----------------------------------------------------------------------------
-  -- Master msgout interface
-  -----------------------------------------------------------------------------
-  signal msgout_valid     : std_logic;
-  signal msgout_ready     : std_logic;
-  signal msgout_data      : std_logic_vector(C_BLOCK_SIZE-1 downto 0);
-  signal msgout_last      : std_logic;
+	-----------------------------------------------------------------------------
+	-- Procedure for reading keys and command
+	--
+	-- The file with the testcase has a section with the keys first followed by
+	-- the messages that will be encrypted/decrypted.
+	--
+	-- Example testcase file without the messages:
+	--
+	--   # KEY N
+	--   99925173ad65686715385ea800cd28120288fc70a9bc98dd4c90d676f8ff768d
+	--   # KEY E
+	--   0000000000000000000000000000000000000000000000000000000000010001
+	--   # KEY D
+	--   0cea1651ef44be1f1f1476b7539bed10d73e3aac782bd9999a1e5a790932bfe9
+	--   # COMMAND
+	--   1
+	--
+	-----------------------------------------------------------------------------
+	procedure read_keys_and_command(
+		signal kn      : out std_logic_vector(C_BLOCK_SIZE-1 downto 0);
+		signal ked     : out std_logic_vector(C_BLOCK_SIZE-1 downto 0);
+		signal kn_prime : out std_logic_vector(31 downto 0);
+		signal kr2modn  : out std_logic_vector(C_BLOCK_SIZE-1 downto 0);
+		signal ksched0  : out std_logic_vector(C_BLOCK_SIZE-1 downto 0);
+		signal ksched1  : out std_logic_vector(C_BLOCK_SIZE-1 downto 0);
+		signal ksched2  : out std_logic_vector(C_BLOCK_SIZE-1 downto 0)
+	)is
+		variable line_from_file: line;
+		variable s1            : string(1 downto 1);
+		variable s8            : string(8 downto 1);
+		variable s64           : string(C_BLOCK_SIZE/4 downto 1);
+		variable command       : std_logic;
+		variable e             : std_logic_vector(C_BLOCK_SIZE-1 downto 0);
+		variable d             : std_logic_vector(C_BLOCK_SIZE-1 downto 0);
+		variable n             : std_logic_vector(C_BLOCK_SIZE-1 downto 0);
+		variable np            : std_logic_vector(31 downto 0);
+		variable r2            : std_logic_vector(C_BLOCK_SIZE-1 downto 0);
+		variable DECR_SCHED0   : std_logic_vector(C_BLOCK_SIZE-1 downto 0);		
+		variable DECR_SCHED1   : std_logic_vector(C_BLOCK_SIZE-1 downto 0);		
+		variable DECR_SCHED2   : std_logic_vector(C_BLOCK_SIZE-1 downto 0);		
+		variable ENCR_SCHED0   : std_logic_vector(C_BLOCK_SIZE-1 downto 0);		
+		variable ENCR_SCHED1   : std_logic_vector(C_BLOCK_SIZE-1 downto 0);		
+		variable ENCR_SCHED2   : std_logic_vector(C_BLOCK_SIZE-1 downto 0);	
+		
+	begin
+		-- Read comment
+		readline(tc_inp, line_from_file);
+		-- Read KEY N
+		readline(tc_inp, line_from_file);
+		read(line_from_file, s64);
+		n := str_to_stdvec(s64);
+		-- Read comment
+		readline(tc_inp, line_from_file);
+		-- Read KEY E
+		readline(tc_inp, line_from_file);
+		read(line_from_file, s64);
+		e := str_to_stdvec(s64);
+		-- Read comment
+		readline(tc_inp, line_from_file);
+		-- Read KEY D
+		readline(tc_inp, line_from_file);
+		read(line_from_file, s64);
+		d := str_to_stdvec(s64);
+		-- Read comment
+		readline(tc_inp, line_from_file);
+		-- Command (Encrypt/Decrypt)
+		-- 1: Encrypt
+		-- 0: Decrypt
+		readline(tc_inp, line_from_file);
+		read(line_from_file, s1);
+		command := str_to_stdvec(s1)(0);
+        -- Read comment
+		readline(tc_inp, line_from_file);
+		-- Read N_PRIME
+		readline(tc_inp, line_from_file);
+		read(line_from_file, s8);
+		np := str_to_stdvec(s8);
+        -- Read comment
+		readline(tc_inp, line_from_file);
+		-- Read R2_MOD_N
+		readline(tc_inp, line_from_file);
+		read(line_from_file, s64);
+		r2 := str_to_stdvec(s64);
+        -- Read comment
+		readline(tc_inp, line_from_file);
+		-- Read DECR_SCHED0
+		readline(tc_inp, line_from_file);
+		read(line_from_file, s64);
+		DECR_SCHED0 := str_to_stdvec(s64);		
+        -- Read comment
+		readline(tc_inp, line_from_file);
+		-- Read DECR_SCHED1
+		readline(tc_inp, line_from_file);
+		read(line_from_file, s64);
+		DECR_SCHED1 := str_to_stdvec(s64);	
+        -- Read comment
+		readline(tc_inp, line_from_file);
+		-- Read DECR_SCHED2
+		readline(tc_inp, line_from_file);
+		read(line_from_file, s64);
+		DECR_SCHED2 := str_to_stdvec(s64);			
+        -- Read comment
+		readline(tc_inp, line_from_file);
+		-- Read ENCR_SCHED0
+		readline(tc_inp, line_from_file);
+		read(line_from_file, s64);
+		ENCR_SCHED0 := str_to_stdvec(s64);		
+        -- Read comment
+		readline(tc_inp, line_from_file);
+		-- Read ENCR_SCHED1
+		readline(tc_inp, line_from_file);
+		read(line_from_file, s64);
+		ENCR_SCHED1 := str_to_stdvec(s64);	
+        -- Read comment
+		readline(tc_inp, line_from_file);
+		-- Read ENCR_SCHED2
+		readline(tc_inp, line_from_file);
+		read(line_from_file, s64);
+		ENCR_SCHED2 := str_to_stdvec(s64);			
+		-- Read empty line
+		readline(tc_inp, line_from_file);
 
-  -----------------------------------------------------------------------------
-  -- Interface to core
-  -----------------------------------------------------------------------------
-  signal key_e_d          : std_logic_vector(C_BLOCK_SIZE-1 downto 0);
-  signal key_n            : std_logic_vector(C_BLOCK_SIZE-1 downto 0);
-  signal rsa_status       : std_logic_vector(31 downto 0);
+		-- Encryption key selected
+		if(command='1')then
+			ked <= e;
+            ksched0 <= ENCR_SCHED0;
+            ksched1 <= ENCR_SCHED1;
+            ksched2 <= ENCR_SCHED2;
+		-- Decryption key selected
+		else
+			ked <= d;
+            ksched0 <= DECR_SCHED0;
+            ksched1 <= DECR_SCHED1;
+            ksched2 <= DECR_SCHED2;			
+		end if;
+		kn <= n;
+        kn_prime <= np;
+        kr2modn  <= r2;
+		
+	end read_keys_and_command;
 
-  -- NEW - Precompute/Schedule signals into rsa_core
-  signal r2_mod_n_s       : std_logic_vector(255 downto 0);
-  signal n_prime_s        : std_logic_vector(31 downto 0);
-  signal vlnw0_s          : std_logic_vector(255 downto 0);
-  signal vlnw1_s          : std_logic_vector(255 downto 0);
-  signal vlnw2_s          : std_logic_vector(255 downto 0);
+	-----------------------------------------------------------------------------
+	-- Procedure for reading input messages
+	-----------------------------------------------------------------------------
+	procedure read_input_message(
+		variable input_message  : out std_logic_vector(C_BLOCK_SIZE-1 downto 0)
+	)is
+		variable line_from_file: line;
+		variable s64           : string(C_BLOCK_SIZE/4 downto 1);
+	begin
+		-- Read input message
+		readline(tc_inp, line_from_file);
+		read(line_from_file, s64);
+		input_message := str_to_stdvec(s64);
+	end read_input_message;
 
-  -----------------------------------------------------------------------------
-  -- Testcase file handles
-  -----------------------------------------------------------------------------
-  file tc_inp: text;
-  file tc_otp: text;
+	-----------------------------------------------------------------------------
+	-- Procedure for reading output messages
+	-----------------------------------------------------------------------------
+	procedure read_output_message(
+		variable output_message  : out std_logic_vector(C_BLOCK_SIZE-1 downto 0)
+	)is
+		variable line_from_file: line;
+		variable s64           : string(C_BLOCK_SIZE/4 downto 1);
+	begin
+		-- Read output message
+		readline(tc_otp, line_from_file);
+		read(line_from_file, s64);
+		output_message := str_to_stdvec(s64);
+	end read_output_message;
 
-  -----------------------------------------------------------------------------
-  -- Open input/output files (unchanged)
-  -----------------------------------------------------------------------------
-  procedure open_tc_inp(testcase_id: in integer) is
-  begin
-    if   testcase_id=0 then file_open(tc_inp, C_TESTCASE_FOLDER & ".inp_messages.hex_pt0_in.txt", read_mode);
-    elsif testcase_id=1 then file_open(tc_inp, C_TESTCASE_FOLDER & ".inp_messages.hex_pt1_in.txt", read_mode);
-    elsif testcase_id=2 then file_open(tc_inp, C_TESTCASE_FOLDER & ".inp_messages.hex_pt2_in.txt", read_mode);
-    elsif testcase_id=3 then file_open(tc_inp, C_TESTCASE_FOLDER & ".inp_messages.hex_ct3_in.txt", read_mode);
-    elsif testcase_id=4 then file_open(tc_inp, C_TESTCASE_FOLDER & ".inp_messages.hex_ct4_in.txt", read_mode);
-    elsif testcase_id=5 then file_open(tc_inp, C_TESTCASE_FOLDER & ".inp_messages.hex_ct5_in.txt", read_mode);
-    end if;
-  end open_tc_inp;
+	-----------------------------------------------------------------------------
+	-- Internal signals
+	-----------------------------------------------------------------------------
 
-  procedure open_tc_otp(testcase_id: in integer) is
-  begin
-    if   testcase_id=0 then file_open(tc_otp, C_TESTCASE_FOLDER & ".otp_messages.hex_ct0_out.txt", read_mode);
-    elsif testcase_id=1 then file_open(tc_otp, C_TESTCASE_FOLDER & ".otp_messages.hex_ct1_out.txt", read_mode);
-    elsif testcase_id=2 then file_open(tc_otp, C_TESTCASE_FOLDER & ".otp_messages.hex_ct2_out.txt", read_mode);
-    elsif testcase_id=3 then file_open(tc_otp, C_TESTCASE_FOLDER & ".otp_messages.hex_pt3_out.txt", read_mode);
-    elsif testcase_id=4 then file_open(tc_otp, C_TESTCASE_FOLDER & ".otp_messages.hex_pt4_out.txt", read_mode);
-    elsif testcase_id=5 then file_open(tc_otp, C_TESTCASE_FOLDER & ".otp_messages.hex_pt5_out.txt", read_mode);
-    end if;
-  end open_tc_otp;
+	-- Testcase control states
+	type tc_ctrl_state_t is (e_TC_START_TC, e_TC_RUN_TC, e_TC_WAIT_COMPLETED, e_TC_COMPLETED, e_TC_ALL_TESTS_COMPLETED);
+	signal tc_ctrl_state : tc_ctrl_state_t;
+	signal all_input_messages_sent: std_logic;
+	signal all_output_messages_received: std_logic;
+	signal test_case_id: integer;
+	signal start_tc    : std_logic;
 
-  -----------------------------------------------------------------------------
-  -- Hex string conversion helpers (unchanged)
-  -----------------------------------------------------------------------------
-  -- Reverse 8×32-bit word order in a 256-bit vector
-  function swap_words32_256(x : std_logic_vector(255 downto 0))
-    return std_logic_vector is
-    variable y : std_logic_vector(255 downto 0);
-  begin
-    for i in 0 to 7 loop
-      y(255-32*i downto 224-32*i) := x(32*i+31 downto 32*i);
-    end loop;
-    return y;
-  end function;
+	-- Msgin control states
+	type msgin_state_t is (e_MSGIN_IDLE, e_MSGIN_SEND, e_MSGIN_COMPLETED);
+	signal msgin_state       : msgin_state_t;
+	signal msgin_counter     : unsigned(15 downto 0);
 
-  -- Reverse 32×8-bit byte order in a 256-bit vector
-  function swap_bytes_256(x : std_logic_vector(255 downto 0))
-    return std_logic_vector is
-    variable y : std_logic_vector(255 downto 0);
-  begin
-    for i in 0 to 31 loop
-      y(255-8*i downto 248-8*i) := x(8*i+7 downto 8*i);
-    end loop;
-    return y;
-  end function;
-  
-  function str_to_stdvec(inp: string) return std_logic_vector is
-    variable temp: std_logic_vector(4*inp'length-1 downto 0) := (others => 'X');
-    variable temp1 : std_logic_vector(3 downto 0);
-  begin
-    for i in inp'range loop
-      case inp(i) is
-        when '0' => temp1 := x"0"; when '1' => temp1 := x"1";
-        when '2' => temp1 := x"2"; when '3' => temp1 := x"3";
-        when '4' => temp1 := x"4"; when '5' => temp1 := x"5";
-        when '6' => temp1 := x"6"; when '7' => temp1 := x"7";
-        when '8' => temp1 := x"8"; when '9' => temp1 := x"9";
-        when 'A'|'a' => temp1 := x"A"; when 'B'|'b' => temp1 := x"B";
-        when 'C'|'c' => temp1 := x"C"; when 'D'|'d' => temp1 := x"D";
-        when 'E'|'e' => temp1 := x"E"; when 'F'|'f' => temp1 := x"F";
-        when others =>  temp1 := "XXXX";
-      end case;
-      temp(4*(i-1)+3 downto 4*(i-1)) := temp1;
-    end loop;
-    return temp;
-  end function;
+	-- Msgout control states
+	type msgout_state_t is (e_MSGOUT_IDLE, e_MSGOUT_RECEIVE, e_MSGOUT_COMPLETED);
+	signal msgout_state      : msgout_state_t;
+	signal msgout_counter    : unsigned(15 downto 0);
 
-  function stdvec_to_string ( a: std_logic_vector) return string is
-    variable b : string (a'length/4 downto 1) := (others => NUL);
-    variable nibble : std_logic_vector(3 downto 0);
-  begin
-    for i in b'length downto 1 loop
-      nibble := a(i*4-1 downto (i-1)*4);
-      case nibble is
-        when "0000" => b(i) := '0'; when "0001" => b(i) := '1';
-        when "0010" => b(i) := '2'; when "0011" => b(i) := '3';
-        when "0100" => b(i) := '4'; when "0101" => b(i) := '5';
-        when "0110" => b(i) := '6'; when "0111" => b(i) := '7';
-        when "1000" => b(i) := '8'; when "1001" => b(i) := '9';
-        when "1010" => b(i) := 'A'; when "1011" => b(i) := 'B';
-        when "1100" => b(i) := 'C'; when "1101" => b(i) := 'D';
-        when "1110" => b(i) := 'E'; when "1111" => b(i) := 'F';
-        when others => b(i) := 'X';
-      end case;
-    end loop;
-    return b;
-  end function;
-
-  -----------------------------------------------------------------------------
-  -- Read keys/command + I/O messages (unchanged)
-  -----------------------------------------------------------------------------
-  procedure read_keys_and_command(
-    signal kn  : out std_logic_vector(C_BLOCK_SIZE-1 downto 0);
-    signal ked : out std_logic_vector(C_BLOCK_SIZE-1 downto 0)
-  ) is
-    variable line_from_file: line;
-    variable s1            : string(1 downto 1);
-    variable s64           : string(C_BLOCK_SIZE/4 downto 1);
-    variable command       : std_logic;
-    variable e             : std_logic_vector(C_BLOCK_SIZE-1 downto 0);
-    variable d             : std_logic_vector(C_BLOCK_SIZE-1 downto 0);
-    variable n             : std_logic_vector(C_BLOCK_SIZE-1 downto 0);
-  begin
-    -- Read comments/keys/command (same format as original)
-    readline(tc_inp, line_from_file); -- # KEY N
-    readline(tc_inp, line_from_file); read(line_from_file, s64); n := str_to_stdvec(s64);
-    readline(tc_inp, line_from_file); -- # KEY E
-    readline(tc_inp, line_from_file); read(line_from_file, s64); e := str_to_stdvec(s64);
-    readline(tc_inp, line_from_file); -- # KEY D
-    readline(tc_inp, line_from_file); read(line_from_file, s64); d := str_to_stdvec(s64);
-    readline(tc_inp, line_from_file); -- # COMMAND
-    readline(tc_inp, line_from_file); read(line_from_file, s1);
-    command := str_to_stdvec(s1)(0);
-    readline(tc_inp, line_from_file); -- empty line
-
-    -- encryption vs decryption selection (file's command)
-    if (command='1') then ked <= e; else ked <= d; end if;
-    kn <= n;
-  end procedure;
-
-  procedure read_input_message(
-    variable input_message  : out std_logic_vector(C_BLOCK_SIZE-1 downto 0)
-  ) is
-    variable line_from_file: line;
-    variable s64           : string(C_BLOCK_SIZE/4 downto 1);
-  begin
-    readline(tc_inp, line_from_file);
-    read(line_from_file, s64);
-    input_message := str_to_stdvec(s64);
-  end procedure;
-
-  procedure read_output_message(
-    variable output_message  : out std_logic_vector(C_BLOCK_SIZE-1 downto 0)
-  ) is
-    variable line_from_file: line;
-    variable s64           : string(C_BLOCK_SIZE/4 downto 1);
-  begin
-    readline(tc_otp, line_from_file);
-    read(line_from_file, s64);
-    output_message := str_to_stdvec(s64);
-  end procedure;
-
-  -----------------------------------------------------------------------------
-  -- Internal TB state
-  -----------------------------------------------------------------------------
-  type tc_ctrl_state_t is (e_TC_START_TC, e_TC_RUN_TC, e_TC_WAIT_COMPLETED, e_TC_COMPLETED, e_TC_ALL_TESTS_COMPLETED);
-  signal tc_ctrl_state : tc_ctrl_state_t;
-  signal all_input_messages_sent       : std_logic;
-  signal all_output_messages_received  : std_logic;
-  signal test_case_id                  : integer;
-  signal start_tc                      : std_logic;
-
-  type msgin_state_t  is (e_MSGIN_IDLE, e_MSGIN_SEND, e_MSGIN_COMPLETED);
-  signal msgin_state  : msgin_state_t;
-  signal msgin_counter: unsigned(15 downto 0);
-
-  type msgout_state_t is (e_MSGOUT_IDLE, e_MSGOUT_RECEIVE, e_MSGOUT_COMPLETED);
-  signal msgout_state : msgout_state_t;
-  signal msgout_counter: unsigned(15 downto 0);
-
-  signal msgout_valid_prev : std_logic;
-  signal msgout_ready_prev : std_logic;
+            signal msgout_valid_prev : std_logic;
+        signal msgout_ready_prev : std_logic;
 
 begin
-  -----------------------------------------------------------------------------
-  -- Clock/reset
-  -----------------------------------------------------------------------------
-  clk_gen: process begin clk <= '1'; wait for 1 ns; clk <= '0'; wait for 1 ns; end process;
-  reset_gen: process begin reset_n <= '0'; wait for 20 ns; reset_n <= '1'; wait; end process;
 
-  -----------------------------------------------------------------------------
-  -- Tie constants to core inputs
-  -----------------------------------------------------------------------------
-  r2_mod_n_s <= R2_MOD_N_C;
-  n_prime_s  <= N_PRIME_C;
-  vlnw0_s    <= VLNW0_C;
-  vlnw1_s    <= VLNW1_C;
-  vlnw2_s    <= VLNW2_C;
+	-----------------------------------------------------------------------------
+	-- Clock and reset generation
+	-----------------------------------------------------------------------------
+	-- Generates a 50MHz clk
+	clk_gen: process is
+	begin
+		clk <= '1';
+		wait for 6 ns;
+		clk <= '0';
+		wait for 6 ns;
+	end process;
 
-  -----------------------------------------------------------------------------
-  -- Testcase controller (modified to limit to ct3..ct5)
-  -----------------------------------------------------------------------------
-  testcase_control: process(clk, reset_n)
-  begin
-    if reset_n = '0' then
-      tc_ctrl_state <= e_TC_START_TC;
-      key_n         <= (others => '0');
-      key_e_d       <= (others => '0');
-      test_case_id  <= C_TEST_FIRST_ID;  -- start at ct3
-      start_tc      <= '0';
-    elsif rising_edge(clk) then
-      start_tc <= '0';
-      case tc_ctrl_state is
-        when e_TC_START_TC =>
-          report "********************************************************************************";
-          report "STARTING NEW TESTCASE ID=" & integer'image(test_case_id);
-          report "********************************************************************************";
-          tc_ctrl_state <= e_TC_RUN_TC;
-          open_tc_inp(test_case_id);
-          open_tc_otp(test_case_id);
-          read_keys_and_command(key_n, key_e_d);
-          start_tc <= '1';
+	-- reset_n generator
+	reset_gen: process is
+	begin
+		reset_n <= '0';
+		wait for 20 ns;
+		reset_n <= '1';
+		wait;
+	end process;
 
-        when e_TC_RUN_TC =>
-          if all_input_messages_sent='1' then
-            tc_ctrl_state <= e_TC_WAIT_COMPLETED;
-          end if;
+	-----------------------------------------------------------------------------
+	-- testcase_control
+	-- Process that sets up the correct keys and initializes the testcases.
+	-----------------------------------------------------------------------------
+	testcase_control: process(clk, reset_n)
+	begin
 
-        when e_TC_WAIT_COMPLETED =>
-          if all_output_messages_received='1' then
-            tc_ctrl_state <= e_TC_COMPLETED;
-          end if;
+		if (reset_n = '0') then
+			tc_ctrl_state          <= e_TC_START_TC;
+            r2_mod_n               <= (others => '0');
+            n_prime                <= (others => '0');
+            vlnw_schedule_0        <= (others => '0');
+            vlnw_schedule_1        <= (others => '0');
+            vlnw_schedule_2        <= (others => '0');
+			key_n                  <= (others => '0');
+			key_e_d                <= (others => '0');
+			test_case_id           <= 0;
+			start_tc               <= '0';
 
-        when e_TC_COMPLETED =>
-          file_close(tc_inp);
-          file_close(tc_otp);
-          if test_case_id >= C_TEST_LAST_ID then
-            tc_ctrl_state <= e_TC_ALL_TESTS_COMPLETED;
-          else
-            test_case_id  <= test_case_id + 1;
-            tc_ctrl_state <= e_TC_START_TC;
-          end if;
+		elsif (clk'event and clk='1') then
 
-        when others =>
-          report "********************************************************************************";
-          report "ALL (DECRYPTION) TESTS FINISHED SUCCESSFULLY";
-          report "********************************************************************************";
-          report "ENDING SIMULATION..." severity Failure;
-      end case;
-    end if;
-  end process;
+			-- Default values
+			start_tc <= '0';
 
-  -----------------------------------------------------------------------------
-  -- msgin BFM (unchanged)
-  -----------------------------------------------------------------------------
-  msgin_bfm: process(clk, reset_n)
-    variable msgin_valid_ready: std_logic_vector(1 downto 0);
-    variable seed1, seed2     : positive;
-    variable rand             : real;
-    variable wait_one_cycle   : integer;
-    variable input_message    : std_logic_vector(C_BLOCK_SIZE-1 downto 0);
-  begin
-    if reset_n='0' then
-      msgin_valid   <= '0';
-      msgin_data    <= (others => '0');
-      msgin_last    <= '0';
-      msgin_counter <= (others => '0');
-      msgin_state   <= e_MSGIN_IDLE;
-    elsif rising_edge(clk) then
-      all_input_messages_sent <= '0';
-      case msgin_state is
-        when e_MSGIN_IDLE =>
-          if start_tc='1' then msgin_state <= e_MSGIN_SEND; end if;
+			case tc_ctrl_state is
 
-        when e_MSGIN_SEND =>
-          msgin_valid_ready := msgin_valid & msgin_ready;
-          case msgin_valid_ready is
-            when "00" | "01" | "11" =>
-              uniform(seed1, seed2, rand); wait_one_cycle := integer(rand);
-              if endfile(tc_inp) then
-                msgin_state <= e_MSGIN_COMPLETED;
-                all_input_messages_sent <= '1';
-                msgin_valid <= '0'; msgin_data <= (others => '0'); msgin_last <= '0';
-              elsif wait_one_cycle=0 then
-                msgin_valid <= '0'; msgin_data <= (others => '0'); msgin_last <= '0';
-              else
-                msgin_valid <= '1';
-                read_input_message(input_message);
-                msgin_data <= input_message;
-                report "DRIVE NEW MSGIN_DATA[" & stdvec_to_string(std_logic_vector(msgin_counter)) & "] RTL: " & stdvec_to_string(input_message);
-                msgin_last  <= msgin_counter(1);
-                msgin_counter <= msgin_counter + 1;
-              end if;
-            when others => null;
-          end case;
+				-- Start a new test case
+				when e_TC_START_TC =>
+					assert true;
+						report "********************************************************************************";
+						report "STARTING NEW TESTCASE";
+						report "********************************************************************************";
 
-        when others =>
-          msgin_state <= e_MSGIN_IDLE;
-      end case;
-    end if;
-  end process;
+					tc_ctrl_state <= e_TC_RUN_TC;
+					open_tc_inp(test_case_id);
+					open_tc_otp(test_case_id);
+					read_keys_and_command(key_n, key_e_d, n_prime, r2_mod_n, vlnw_schedule_0, vlnw_schedule_1, vlnw_schedule_2);
+					start_tc      <= '1';
 
-  -----------------------------------------------------------------------------
-  -- msgout BFM (unchanged + safety assertion)
-  -----------------------------------------------------------------------------
-  msgout_bfm: process(clk, reset_n)
-    variable msgout_valid_ready    : std_logic_vector(1 downto 0);
-    variable seed1, seed2          : positive;
-    variable rand                  : real;
-    variable wait_one_cycle        : integer;
-    variable expected_msgout_data  : std_logic_vector(C_BLOCK_SIZE-1 downto 0);
-    variable dut_norm : std_logic_vector(255 downto 0);
-  begin
-    if reset_n='0' then
-      msgout_ready   <= '0';
-      msgout_counter <= (others => '0');
-      msgout_state   <= e_MSGOUT_IDLE;
-    elsif rising_edge(clk) then
-      all_output_messages_received <= '0';
-      msgout_valid_prev <= msgout_valid;
-      msgout_ready_prev <= msgout_ready;
+				-- Run the testcase
+				when e_TC_RUN_TC =>
+					if(all_input_messages_sent='1') then
+						tc_ctrl_state <= e_TC_WAIT_COMPLETED;
+					end if;
 
-      case msgout_state is
-        when e_MSGOUT_IDLE =>
-          if start_tc='1' then msgout_state <= e_MSGOUT_RECEIVE; end if;
+				-- Wait for all the output messages to arrive
+				when e_TC_WAIT_COMPLETED =>
+					if(all_output_messages_received='1') then
+						tc_ctrl_state <= e_TC_COMPLETED;
+					end if;
 
-        when e_MSGOUT_RECEIVE =>
-          uniform(seed1, seed2, rand); wait_one_cycle := integer(rand);
-          if (wait_one_cycle=0) then msgout_ready <= '0'; else msgout_ready <= '1'; end if;
+				-- Testcase is finished
+				when e_TC_COMPLETED =>
+					if(test_case_id>=5)then
+						tc_ctrl_state <= e_TC_ALL_TESTS_COMPLETED;
+					else
+						tc_ctrl_state <= e_TC_START_TC;
+						test_case_id <= test_case_id+1;
+					end if;
+					file_close(tc_inp);
+					file_close(tc_otp);
 
-          if ((msgout_valid_prev='1') and (msgout_valid='0') and (msgout_ready_prev='0')) then
-            report "Error in AXIS-Handshake. msgout_valid drops while msgout_ready='0'." severity Failure;
-          end if;
 
-          msgout_valid_ready := msgout_valid & msgout_ready;
-          case msgout_valid_ready is
-            when "11" =>
-              msgout_counter <= msgout_counter + 1;
-              read_output_message(expected_msgout_data);
+				-- All tests have been completed
+				when others => --e_TC_ALL_TESTS_COMPLETED =>
+					assert true;
+						report "********************************************************************************";
+						report "ALL TESTS FINISHED SUCCESSFULLY";
+						report "********************************************************************************";
+						report "ENDING SIMULATION..." severity Failure;
 
-              -- normalize DUT output for compare (try A: 32-bit word swap)
-              dut_norm := msgout_data;
+			end case;
+		end if;
+	end process;
 
-              -- helpful print uses the normalized value
-              report "COMPARE MSGOUT_DATA[" & stdvec_to_string(std_logic_vector(msgout_counter)) &
-                    "] DUT = " & stdvec_to_string(dut_norm) &
-                    "   EXPECTED = " & stdvec_to_string(expected_msgout_data);
+	-----------------------------------------------------------------------------
+	-- msgin_bfm
+	-- Process that sends messages into the rsa_core
+	-----------------------------------------------------------------------------
+	msgin_bfm: process(clk, reset_n)
+		variable msgin_valid_ready: std_logic_vector(1 downto 0);
+		variable seed1, seed2     : positive;   -- seed values for random generator
+		variable rand             : real;       -- random real-number value in range 0 to 1.0
+		variable wait_one_cycle   : integer;    -- Used for inserting delays between messages.
+		variable input_message    : std_logic_vector(C_BLOCK_SIZE-1 downto 0);
+	begin
 
-              -- single assert on the normalized value
-              assert dut_norm = expected_msgout_data
-              report "Output message differs from expected result"
-              severity Failure;
+		if (reset_n = '0') then
+			-- Drive the inputs of rsa_core to default values
+			msgin_valid   <= '0';
+			msgin_data    <= (others => '0');
+			msgin_last    <= '0';
+			msgin_counter <= (others => '0');
 
-              assert msgout_counter(1) = msgout_last
-                report "msgin_last/msgout_last mismatch"
-                severity Failure;
-            when others =>
-              if endfile(tc_otp) then
-                msgout_state <= e_MSGOUT_COMPLETED;
-                all_output_messages_received <= '1';
-              end if;
-          end case;
+		elsif (clk'event and clk='1') then
 
-        when others =>
-          msgout_state <= e_MSGOUT_IDLE;
-      end case;
-    end if;
-  end process;
+			-- Default values
+			all_input_messages_sent <= '0';
 
-  -----------------------------------------------------------------------------
-  -- DUT: rsa_core (now with the extra ports connected)
-  -----------------------------------------------------------------------------
-  u_rsa_core : entity work.rsa_core
-    generic map (
-      C_BLOCK_SIZE => C_BLOCK_SIZE
-    )
-    port map (
-      clk             => clk,
-      reset_n         => reset_n,
-      msgin_valid     => msgin_valid,
-      msgin_ready     => msgin_ready,
-      msgin_data      => msgin_data,
-      msgin_last      => msgin_last,
-      msgout_valid    => msgout_valid,
-      msgout_ready    => msgout_ready,
-      msgout_data     => msgout_data,
-      msgout_last     => msgout_last,
-      -- keys/status
-      key_e_d         => key_e_d,
-      key_n           => key_n,
-      rsa_status      => rsa_status,
-      -- NEW: precompute/schedules
-      r2_mod_n        => r2_mod_n_s,
-      n_prime         => n_prime_s,
-      vlnw_schedule_0 => vlnw0_s,
-      vlnw_schedule_1 => vlnw1_s,
-      vlnw_schedule_2 => vlnw2_s
-    );
+			case msgin_state is
+
+				-- Wait until a new test is started
+				when e_MSGIN_IDLE =>
+					if(start_tc='1') then
+						msgin_state <= e_MSGIN_SEND;
+					end if;
+
+				-- Send messages
+				when e_MSGIN_SEND =>
+					msgin_valid_ready := msgin_valid & msgin_ready;
+					case msgin_valid_ready is
+
+						-- Send a new message if possible
+						when "00"|"01"|"11" =>
+							-- Generate a random number. It will be used for
+							-- deciding whether or not to insert delays between messages
+							uniform(seed1, seed2, rand);
+							wait_one_cycle := integer(rand);
+
+							-- Check if there are more messages to send
+							if(endfile(tc_inp)) then
+								msgin_state <= e_MSGIN_COMPLETED;
+								all_input_messages_sent <= '1';
+								msgin_valid <= '0';
+								msgin_data  <= (others => '0');
+								msgin_last  <= '0';
+
+							-- Wait a cycle before sending any new messages
+							elsif(wait_one_cycle=0) then
+								msgin_valid <= '0';
+								msgin_data  <= (others => '0');
+								msgin_last  <= '0';
+
+							-- Send a new message
+							-- The last signal is set now and then.
+							else
+								msgin_valid <= '1';
+								read_input_message(input_message);
+								msgin_data <= input_message;
+								report "DRIVE NEW MSGIN_DATA[" & stdvec_to_string(std_logic_vector(msgin_counter)) & "] " & "RTL: " & stdvec_to_string(input_message);
+								msgin_last <= msgin_counter(1);
+								msgin_counter <= msgin_counter + 1;
+							end if;
+
+						-- We are currently trying to send a message,
+						-- but it has not yet been accepted.
+						when others => -- "10" =>
+					end case;
+
+				-- All messages have been sent
+				when others => --e_MSGIN_COMPLETED =>
+					msgin_state <= e_MSGIN_IDLE;
+
+			end case;
+		end if;
+	end process;
+
+	-----------------------------------------------------------------------------
+	-- msgout_bfm
+	-- Process that receives messages from the rsa_core
+	-----------------------------------------------------------------------------
+	msgout_bfm: process(clk, reset_n)
+		variable msgout_valid_ready    : std_logic_vector(1 downto 0);
+		variable seed1, seed2          : positive;   -- seed values for random generator
+		variable rand                  : real;       -- random real-number value in range 0 to 1.0
+		variable wait_one_cycle        : integer;    -- Used for inserting delays between messages.
+		variable expected_msgout_data  : std_logic_vector(C_BLOCK_SIZE-1 downto 0);
+	begin
+
+		if (reset_n = '0') then
+			-- Drive the inputs of rsa_core to default values
+			msgout_ready   <= '0';
+			msgout_counter <= (others => '0');
+
+		elsif (clk'event and clk='1') then
+            
+			-- Default values
+			all_output_messages_received <= '0';
+            msgout_valid_prev <= msgout_valid;
+            msgout_ready_prev <= msgout_ready;
+    
+			case msgout_state is
+
+				-- Wait until a new test is started
+				when e_MSGOUT_IDLE =>
+					if(start_tc='1') then
+						msgout_state <= e_MSGOUT_RECEIVE;
+					end if;
+
+				-- Send messages
+				when e_MSGOUT_RECEIVE =>
+					-- Generate a random number. It will be used for
+					-- deciding whether or not to drive the msgout_ready signal low and
+					-- block incoming messages.
+					uniform(seed1, seed2, rand);
+					wait_one_cycle := integer(rand);
+					if(wait_one_cycle=0) then
+						msgout_ready <= '0';
+					else
+						msgout_ready <= '1';
+					end if;
+					
+					if((msgout_valid_prev = '1') and (msgout_valid = '0') and (msgout_ready_prev = '0')) then
+								assert true;
+							        report "Error in AXIS-Handshake. msgout_valid goes high to low without msgout_ready high."
+								    severity Failure;
+					end if;
+
+					msgout_valid_ready := msgout_valid & msgout_ready;
+					case msgout_valid_ready is
+
+						-- Check that the result is correct when a message is
+						-- received
+						when "11" =>
+							msgout_counter <= msgout_counter + 1;
+							read_output_message(expected_msgout_data);
+							assert true;
+								report "COMPARE MSGOUT_DATA[" & stdvec_to_string(std_logic_vector(msgout_counter)) & "] " & "RTL: " & stdvec_to_string(msgout_data) & "   EXPECTED: " & stdvec_to_string(expected_msgout_data);
+							assert expected_msgout_data = msgout_data
+								report "Output message differs from the expected result"
+								severity Failure;
+							assert msgout_counter(1) = msgout_last
+								report "msgin_last/msgout_last mismatch"
+								severity Failure;
+
+						-- Receive a new message now and then
+						when others => --"00"|"01"|"10" =>
+							-- Check if there are more messages to send
+							if(endfile(tc_otp)) then
+								msgout_state <= e_MSGOUT_COMPLETED;
+								all_output_messages_received <= '1';
+							end if;
+
+					end case;
+
+				-- All messages have been sent
+				when others => --e_MSGOUT_COMPLETED =>
+					msgout_state <= e_MSGOUT_IDLE;
+
+			end case;
+		end if;
+	end process;
+
+
+---------------------------------------------------------------------------------
+-- Instantiate the design under test (DUT)
+---------------------------------------------------------------------------------
+u_rsa_core : entity work.rsa_core
+	generic map (
+		C_BLOCK_SIZE => C_BLOCK_SIZE
+	)
+	port map (
+		-----------------------------------------------------------------------------
+		-- Clocks and reset
+		-----------------------------------------------------------------------------
+		clk                    => clk,
+		reset_n                => reset_n,
+
+		-----------------------------------------------------------------------------
+		-- Slave msgin interface
+		-----------------------------------------------------------------------------
+		msgin_valid            => msgin_valid,
+		msgin_ready            => msgin_ready,
+		msgin_data             => msgin_data,
+		msgin_last             => msgin_last,
+
+		-----------------------------------------------------------------------------
+		-- Master msgout interface
+		-----------------------------------------------------------------------------
+		msgout_valid           => msgout_valid,
+		msgout_ready           => msgout_ready,
+		msgout_data            => msgout_data,
+		msgout_last            => msgout_last,
+
+		-----------------------------------------------------------------------------
+		-- Interface to the register block
+		-----------------------------------------------------------------------------
+		r2_mod_n               => r2_mod_n,
+		n_prime                => n_prime,
+		vlnw_schedule_0        => vlnw_schedule_0,
+		vlnw_schedule_1        => vlnw_schedule_1,
+		vlnw_schedule_2        => vlnw_schedule_2,		
+		key_e_d                => key_e_d,
+		key_n                  => key_n,
+		rsa_status             => rsa_status
+
+	);
+
+
 
 end struct;
