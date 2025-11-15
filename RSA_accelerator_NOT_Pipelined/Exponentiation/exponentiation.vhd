@@ -15,7 +15,6 @@ entity exponentiation is
 
     -- input data
     message   : in  std_logic_vector(C_block_size-1 downto 0);
-    key       : in  std_logic_vector(C_block_size-1 downto 0);
     r2_mod_n  : in  std_logic_vector(C_block_size-1 downto 0);
     n_prime   : in  std_logic_vector(31 downto 0);
 
@@ -143,7 +142,6 @@ architecture rtl of exponentiation is
   
   -- declarations
   signal message_r  : std_logic_vector(C_block_size-1 downto 0);
-  signal key_r      : std_logic_vector(C_block_size-1 downto 0);
   signal r2_mod_n_r : std_logic_vector(C_block_size-1 downto 0);
   signal n_prime_r  : std_logic_vector(31 downto 0);
   signal modulus_r  : std_logic_vector(C_block_size-1 downto 0);
@@ -267,7 +265,6 @@ begin
       
       -- NEW: clear latched inputs
       message_r     <= (others => '0');
-      key_r         <= (others => '0');
       r2_mod_n_r    <= (others => '0');
       n_prime_r     <= (others => '0');
       modulus_r     <= (others => '0');
@@ -293,7 +290,6 @@ begin
             -- LATCH EVERYTHING AT THE TRANSFER EDGE
             message_r  <= message(255 downto 0);
             msgout_last_r <= last_in;
-            key_r      <= key;
             r2_mod_n_r <= r2_mod_n;
             n_prime_r  <= n_prime;
             modulus_r  <= modulus;
