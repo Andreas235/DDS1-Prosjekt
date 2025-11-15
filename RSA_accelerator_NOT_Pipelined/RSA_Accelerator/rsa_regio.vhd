@@ -15,11 +15,14 @@
 --   This module contains 33 registers of 32 bit each. The registers can be
 --   accessed trough an AXI Lite interface.
 --
---   Registers   [7..0]: Used for the 256 bit key_n
---   Registers  [15..8]: Used for the 256 bit key_e/key_d
---   Registers [31..16]: Unused
---   Register      [32]: Status register
---   Registers [63..33]: unimplemented, easy to add
+--   Registers    [7..0]: Used for the 256 bit key_n
+--   Registers   [15..8]: Used for the 256 bit R^2 mod n
+--   Registers  [23..16]: Used for the 256 bit vlnw schedule 0
+--   Registers  [31..24]: Used for the 256 bit vlnw schedule 1
+--   Registers  [39..32]: Used for the 256 bit vlnw schedule 2
+--   Register       [40]: Used for the 32 bit n-prime
+--   Register       [41]: Status register
+--   Registers  [63..42]: implemented, unused
 --------------------------------------------------------------------------------
 library ieee;
 use ieee.std_logic_1164.all;
@@ -29,7 +32,7 @@ entity rsa_regio is
 	generic (
 		-- Users to add parameters here
 		C_BLOCK_SIZE        : integer := 256;
-		C_register_count    : integer := 64; --optinally replace with 64 --should probably be constant
+		C_register_count    : integer := 64;
 
 		-- User parameters ends
 		-- Do not modify the parameters beyond this line
@@ -40,16 +43,16 @@ entity rsa_regio is
 		C_S_AXI_ADDR_WIDTH  : integer   := 8
 	);
 	port (
-		-- to rsa_core
-        key_e_d          : out std_logic_vector(C_BLOCK_SIZE-1 downto 0);
-        key_n            : out std_logic_vector(C_BLOCK_SIZE-1 downto 0);
-
-        -- NEW: precomputed values and VLNW schedules
-        r2_mod_n         : out std_logic_vector(255 downto 0);
-        vlnw_schedule_0  : out std_logic_vector(255 downto 0);
-        vlnw_schedule_1  : out std_logic_vector(255 downto 0);
-        vlnw_schedule_2  : out std_logic_vector(255 downto 0);
-        n_prime          : out std_logic_vector(31 downto 0);
+		-- Users to add ports here
+		key_n           : out std_logic_vector(255 downto 0);
+		r2_mod_n        : out std_logic_vector(255 downto 0);
+		vlnw_schedule_0 : out std_logic_vector(255 downto 0);
+		vlnw_schedule_1 : out std_logic_vector(255 downto 0);
+		vlnw_schedule_2 : out std_logic_vector(255 downto 0);
+		n_prime         : out std_logic_vector(31 downto 0);
+        rsa_status      : in  std_logic_vector(31 downto 0);
+        
+		-- User ports ends
 		-- Do not modify the ports beyond this line
 
 		-- Global Clock Signal
@@ -140,7 +143,7 @@ architecture rtl of rsa_regio is
 	----------------------------------------------
 	-- Signals for user logic register space example
 	------------------------------------------------
-	-- Number of Slave Registers 33
+	-- Number of Slave Registers 33 (trying to implement 64 now)
 	type slv_reg_type is array(C_register_count downto 0) of std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
 	signal slv_reg 		: slv_reg_type;
 	signal slv_reg_rden : std_logic;
@@ -252,17 +255,19 @@ begin
 				-- Update the RSA status register
 				-- TODO: Add clock enable to avoid clocking the register
 				-- every clock cycle. This will reduce the energy consumption.
-				--slv_reg(32) <= rsa_status;
+				slv_reg(41) <= rsa_status;
 
 				if (slv_reg_wren = '1') then
 					for byte_index in 0 to (C_S_AXI_DATA_WIDTH/8-1) loop
 						if ( S_AXI_WSTRB(byte_index) = '1' ) then
 							-- Respective byte enables are asserted as per write strobes
+							slv_reg(to_integer(unsigned(loc_addr)))(byte_index*8+7 downto byte_index*8) <= S_AXI_WDATA(byte_index*8+7 downto byte_index*8);
+							-- The old shit below
 							-- slave registers 0-31
-							-- only write to first half of registers
-							if (loc_addr(OPT_MEM_ADDR_BITS) = '0') then
-								slv_reg(to_integer(unsigned(loc_addr(OPT_MEM_ADDR_BITS-1 downto 0))))(byte_index*8+7 downto byte_index*8) <= S_AXI_WDATA(byte_index*8+7 downto byte_index*8);
-							end if;
+							-- only write to first half of registers							
+--							if (loc_addr(OPT_MEM_ADDR_BITS) = '0') then
+--								slv_reg(to_integer(unsigned(loc_addr(OPT_MEM_ADDR_BITS-1 downto 0))))(byte_index*8+7 downto byte_index*8) <= S_AXI_WDATA(byte_index*8+7 downto byte_index*8);
+--							end if;
 						end if;
 					end loop;
 				end if;
@@ -359,12 +364,15 @@ begin
 			-- read from slave registers
 			-- read from all registers
 			-- potentially remove case to unlock all registers
-			case (loc_addr(OPT_MEM_ADDR_BITS)) is
-				when '0' =>
-					reg_data_out <= slv_reg(to_integer(unsigned(loc_addr(OPT_MEM_ADDR_BITS-1 downto 0))));
-				when others =>
-					reg_data_out <= slv_reg(32);
-			end case;
+			--  -- DONE: Andreas N. 14:51 Square Cock Saturday 15. November 2025
+			reg_data_out <= slv_reg(to_integer(unsigned(loc_addr(OPT_MEM_ADDR_BITS-1 downto 0))));
+			-- The old shit below
+--			case (loc_addr(OPT_MEM_ADDR_BITS)) is
+--				when '0' =>
+--					reg_data_out <= slv_reg(to_integer(unsigned(loc_addr(OPT_MEM_ADDR_BITS-1 downto 0))));
+--				when others =>
+--					reg_data_out <= slv_reg(32);
+--			end case;
 	end process;
 
 	-- Output register or memory read data
@@ -386,24 +394,13 @@ begin
 	end process;
 
 	-- Add user logic here
-	key_n <= slv_reg(7) & slv_reg(6) & slv_reg(5) & slv_reg(4) & slv_reg(3) & slv_reg(2) & slv_reg(1) & slv_reg(0);
-	key_e_d  <= slv_reg(15) & slv_reg(14) & slv_reg(13) & slv_reg(12) & slv_reg(11) & slv_reg(10) & slv_reg(9) & slv_reg(8);
-
-	-- Little-endian 32-bit words: word0 is least significant.
-    r2_mod_n     <= slv_reg(23) & slv_reg(22) & slv_reg(21) & slv_reg(20) &
-                 slv_reg(19) & slv_reg(18) & slv_reg(17) & slv_reg(16);
-
-    vlnw_schedule_0 <= slv_reg(31) & slv_reg(30) & slv_reg(29) & slv_reg(28) &
-                    slv_reg(27) & slv_reg(26) & slv_reg(25) & slv_reg(24);
-
-    vlnw_schedule_1 <= slv_reg(39) & slv_reg(38) & slv_reg(37) & slv_reg(36) &
-                    slv_reg(35) & slv_reg(34) & slv_reg(33) & slv_reg(32);
-
-    vlnw_schedule_2 <= slv_reg(47) & slv_reg(46) & slv_reg(45) & slv_reg(44) &
-                    slv_reg(43) & slv_reg(42) & slv_reg(41) & slv_reg(40);
-
-    n_prime       <= slv_reg(48);
-
+	key_n            <= slv_reg(7)  & slv_reg(6)  & slv_reg(5)  & slv_reg(4)  & slv_reg(3)  & slv_reg(2)  & slv_reg(1)  & slv_reg(0);
+	r2_mod_n         <= slv_reg(15) & slv_reg(14) & slv_reg(13) & slv_reg(12) & slv_reg(11) & slv_reg(10) & slv_reg(9)  & slv_reg(8);
+	vlnw_schedule_0  <= slv_reg(23) & slv_reg(22) & slv_reg(21) & slv_reg(20) & slv_reg(19) & slv_reg(18) & slv_reg(17) & slv_reg(16);
+	vlnw_schedule_1  <= slv_reg(31) & slv_reg(30) & slv_reg(29) & slv_reg(28) & slv_reg(27) & slv_reg(26) & slv_reg(25) & slv_reg(24);
+	vlnw_schedule_2  <= slv_reg(39) & slv_reg(38) & slv_reg(37) & slv_reg(36) & slv_reg(35) & slv_reg(34) & slv_reg(33) & slv_reg(32);
+	n_prime          <= slv_reg(40);
+--	rsa_status is set to slv_reg(42)
 
 	-- User logic ends
 

@@ -7,31 +7,45 @@ entity rsa_core is
     C_BLOCK_SIZE : integer := 256
   );
   port (
-    clk             : in  std_logic;
-    reset_n         : in  std_logic;
+    -----------------------------------------------------------------------------
+    -- Clocks and reset
+    -----------------------------------------------------------------------------
+    clk                    :  in std_logic;
+    reset_n                :  in std_logic;
 
-    -- Slave msgin
-    msgin_valid     : in  std_logic;
-    msgin_ready     : out std_logic;
-    msgin_data      : in  std_logic_vector(C_BLOCK_SIZE-1 downto 0);
-    msgin_last      : in  std_logic;
+    -----------------------------------------------------------------------------
+    -- Slave msgin interface
+    -----------------------------------------------------------------------------
+    -- Message that will be sent out is valid
+    msgin_valid             : in std_logic;
+    -- Slave ready to accept a new message
+    msgin_ready             : out std_logic;
+    -- Message that will be sent out of the rsa_msgin module
+    msgin_data              :  in std_logic_vector(C_BLOCK_SIZE-1 downto 0);
+    -- Indicates boundary of last packet
+    msgin_last              :  in std_logic;
 
-    -- Master msgout
-    msgout_valid    : out std_logic;
-    msgout_ready    : in  std_logic;
-    msgout_data     : out std_logic_vector(C_BLOCK_SIZE-1 downto 0);
-    msgout_last     : out std_logic;
+    -----------------------------------------------------------------------------
+    -- Master msgout interface
+    -----------------------------------------------------------------------------
+    -- Message that will be sent out is valid
+    msgout_valid            : out std_logic;
+    -- Slave ready to accept a new message
+    msgout_ready            :  in std_logic;
+    -- Message that will be sent out of the rsa_msgin module
+    msgout_data             : out std_logic_vector(C_BLOCK_SIZE-1 downto 0);
+    -- Indicates boundary of last packet
+    msgout_last             : out std_logic;
 
-    -- Precompute/schedule
-    r2_mod_n        : in  std_logic_vector(C_BLOCK_SIZE-1 downto 0);
+    -----------------------------------------------------------------------------
+    -- Interface to the register block
+    -----------------------------------------------------------------------------
+    key_n           : in  std_logic_vector(255 downto 0);
+    r2_mod_n        : in  std_logic_vector(255 downto 0);
     n_prime         : in  std_logic_vector(31 downto 0);
     vlnw_schedule_0 : in  std_logic_vector(255 downto 0);
     vlnw_schedule_1 : in  std_logic_vector(255 downto 0);
     vlnw_schedule_2 : in  std_logic_vector(255 downto 0);
-
-    -- Keys/status
-    key_e_d         : in  std_logic_vector(C_BLOCK_SIZE-1 downto 0);
-    key_n           : in  std_logic_vector(C_BLOCK_SIZE-1 downto 0);
     rsa_status      : out std_logic_vector(31 downto 0)
   );
 end rsa_core;
@@ -54,7 +68,6 @@ begin
     port map (
       -- input data/control
       message         => msgin_data,
-      key             => key_e_d,
       r2_mod_n        => r2_mod_n,
       n_prime         => n_prime,
       vlnw_schedule_0 => vlnw_schedule_0,
@@ -108,10 +121,6 @@ begin
       end if;
     end if;
   end process;
-
-  -- (Optional) safety: output must not be valid unless we have a last stored
-  -- assert (exp_valid_out = '0') or (last_q_valid = '1')
-  --   report "Output valid but last_q_valid=0" severity failure;
 
   rsa_status <= (others => '0');
 end rtl;
