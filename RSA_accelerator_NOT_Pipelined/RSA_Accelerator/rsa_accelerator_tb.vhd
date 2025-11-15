@@ -61,7 +61,6 @@ architecture struct of rsa_accelerator_tb is
 	-----------------------------------------------------------------------------
 	-- Interface to the register block
 	-----------------------------------------------------------------------------
-	signal key_e_d         : std_logic_vector(C_BLOCK_SIZE-1 downto 0);
 	signal key_n           : std_logic_vector(C_BLOCK_SIZE-1 downto 0);
 	signal r2_mod_n        : std_logic_vector(C_BLOCK_SIZE-1 downto 0);
 	signal n_prime         : std_logic_vector(31 downto 0);
@@ -205,7 +204,7 @@ architecture struct of rsa_accelerator_tb is
 	-----------------------------------------------------------------------------
 	procedure read_keys_and_command(
 		signal kn      : out std_logic_vector(C_BLOCK_SIZE-1 downto 0);
-		signal ked     : out std_logic_vector(C_BLOCK_SIZE-1 downto 0);
+--		signal ked     : out std_logic_vector(C_BLOCK_SIZE-1 downto 0);
 		signal kn_prime : out std_logic_vector(31 downto 0);
 		signal kr2modn  : out std_logic_vector(C_BLOCK_SIZE-1 downto 0);
 		signal ksched0  : out std_logic_vector(C_BLOCK_SIZE-1 downto 0);
@@ -309,13 +308,13 @@ architecture struct of rsa_accelerator_tb is
 
 		-- Encryption key selected
 		if(command='1')then
-			ked <= e;
+--			ked <= e;
             ksched0 <= ENCR_SCHED0;
             ksched1 <= ENCR_SCHED1;
             ksched2 <= ENCR_SCHED2;
 		-- Decryption key selected
 		else
-			ked <= d;
+--			ked <= d;
             ksched0 <= DECR_SCHED0;
             ksched1 <= DECR_SCHED1;
             ksched2 <= DECR_SCHED2;			
@@ -419,7 +418,6 @@ begin
             vlnw_schedule_1        <= (others => '0');
             vlnw_schedule_2        <= (others => '0');
 			key_n                  <= (others => '0');
-			key_e_d                <= (others => '0');
 			test_case_id           <= 0;
 			start_tc               <= '0';
 
@@ -440,7 +438,7 @@ begin
 					tc_ctrl_state <= e_TC_RUN_TC;
 					open_tc_inp(test_case_id);
 					open_tc_otp(test_case_id);
-					read_keys_and_command(key_n, key_e_d, n_prime, r2_mod_n, vlnw_schedule_0, vlnw_schedule_1, vlnw_schedule_2);
+					read_keys_and_command(key_n, n_prime, r2_mod_n, vlnw_schedule_0, vlnw_schedule_1, vlnw_schedule_2);
 					start_tc      <= '1';
 
 				-- Run the testcase
@@ -686,7 +684,6 @@ u_rsa_core : entity work.rsa_core
 		vlnw_schedule_0        => vlnw_schedule_0,
 		vlnw_schedule_1        => vlnw_schedule_1,
 		vlnw_schedule_2        => vlnw_schedule_2,		
-		key_e_d                => key_e_d,
 		key_n                  => key_n,
 		rsa_status             => rsa_status
 
