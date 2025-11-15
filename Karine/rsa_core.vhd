@@ -56,9 +56,11 @@ architecture rtl of rsa_core is
   signal fifo_cnt  : integer range 0 to LAST_FIFO_DEPTH := 0;
 begin
   -- Exponentiation instance
-  i_exponentiation : entity work.exponentiation
+  i_exp_multicore : entity work.exp_multicore
     generic map (
-      C_block_size => C_BLOCK_SIZE
+      C_block_size => C_BLOCK_SIZE,
+      N_CORES      => 4,
+      DEBUG        => false
     )
     port map (
       -- input data/control
@@ -94,8 +96,6 @@ begin
     -- Outputs come straight from exponentiation
     msgout_valid <= exp_valid_out;
     msgout_data  <= exp_result;
-    
-
     
     -- Drive msgout_last from the entry that will be consumed next
     msgout_last <= last_fifo(rd_ptr);
