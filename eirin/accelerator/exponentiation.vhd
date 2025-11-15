@@ -442,57 +442,95 @@ begin
         when S_TO_MONT_A =>
           n_reg <= modulus_r;  -- shared
           -- Prepare batch operands: MonPro(msg[i], R2)
-          for i in 0 to cur_lanes-1 loop
-            batchA(i) <= msg(i);
-            batchB(i) <= r2_mod_n_r;
-          end loop;
+          -- CLEAR
+            for i in 0 to LANES-1 loop
+              batchA(i) <= (others => '0');
+              batchB(i) <= (others => '0');
+            end loop;
+            -- FILL active lanes
+            for i in 0 to LANES-1 loop
+              if i < cur_lanes then
+                batchA(i) <= msg(i);
+                batchB(i) <= r2_mod_n_r;
+              end if;
+            end loop;
           issue_idx <= 0;
           mpb_st <= MPB_KICK;
           st     <= S_WAIT_TO_MONT_A;
         
         when S_WAIT_TO_MONT_A =>
           if mp_batch_done = '1' then
-            for i in 0 to cur_lanes-1 loop
-              acc5(i) <= batchR(i);
+            for i in 0 to LANES-1 loop
+              if i < cur_lanes then
+                acc5(i) <= batchR(i);
+              end if;
             end loop;
             st <= S_TO_MONT_ONE;
           end if;
 
         when S_TO_MONT_ONE =>
-          for i in 0 to cur_lanes-1 loop
-            batchA(i) <= (others => '0'); batchA(i)(0) <= '1';
-            batchB(i) <= r2_mod_n_r;
-          end loop;
+          -- CLEAR
+            for i in 0 to LANES-1 loop
+              batchA(i) <= (others => '0');
+              batchB(i) <= (others => '0');
+            end loop;
+            -- FILL
+            for i in 0 to LANES-1 loop
+              if i < cur_lanes then
+                batchA(i) <= (others => '0'); batchA(i)(0) <= '1';
+                batchB(i) <= r2_mod_n_r;
+              end if;
+            end loop;
           issue_idx <= 0;
           mpb_st <= MPB_KICK;
           st     <= S_WAIT_TO_MONT_ONE;
         
         when S_WAIT_TO_MONT_ONE =>
           if mp_batch_done = '1' then
-            for i in 0 to cur_lanes-1 loop
-              oneM5(i) <= batchR(i);
+            for i in 0 to LANES-1 loop
+              if i < cur_lanes then
+                oneM5(i) <= batchR(i);
+              end if;
             end loop;
             st <= S_A2;  -- next precompute rounds
           end if;
 
         when S_A2 =>
-          for i in 0 to cur_lanes-1 loop
-            batchA(i) <= acc5(i);
-            batchB(i) <= acc5(i);
-          end loop;
+          -- CLEAR
+            for i in 0 to LANES-1 loop
+              batchA(i) <= (others => '0');
+              batchB(i) <= (others => '0');
+            end loop;
+            -- FILL
+            for i in 0 to LANES-1 loop
+              if i < cur_lanes then
+                batchA(i) <= acc5(i);
+                batchB(i) <= acc5(i);
+              end if;
+            end loop;
           issue_idx <= 0;
           mpb_st <= MPB_KICK;
           st     <= S_WAIT_A2;
         
         when S_WAIT_A2 =>
           if mp_batch_done = '1' then
-            for i in 0 to cur_lanes-1 loop
-              A2_5(i)  <= batchR(i);
+            for i in 0 to LANES-1 loop
+              if i < cur_lanes then
+                A2_5(i)  <= batchR(i);
+              end if;
             end loop;
             -- A^3 = A^2 * A
-            for i in 0 to cur_lanes-1 loop
-              batchA(i) <= batchR(i);  -- A^2
-              batchB(i) <= acc5(i);    -- A
+            -- CLEAR
+            for i in 0 to LANES-1 loop
+              batchA(i) <= (others => '0');
+              batchB(i) <= (others => '0');
+            end loop;
+            -- FILL (A^3 = A^2 * A)
+            for i in 0 to LANES-1 loop
+              if i < cur_lanes then
+                batchA(i) <= batchR(i);  -- A^2
+                batchB(i) <= acc5(i);    -- A
+              end if;
             end loop;
             issue_idx <= 0;
             mpb_st    <= MPB_KICK;
@@ -501,15 +539,25 @@ begin
 
         when S_WAIT_A3 =>
           if mp_batch_done = '1' then
-            for i in 0 to cur_lanes-1 loop
-              tbl5(i)(1) <= batchR(i);     -- A^3
-              tbl5(i)(0) <= acc5(i);       -- A^1
+            for i in 0 to LANES-1 loop
+              if i < cur_lanes then
+                tbl5(i)(1) <= batchR(i);     -- A^3
+                tbl5(i)(0) <= acc5(i);       -- A^1
+              end if;
             end loop;
             tbl_idx <= 2;  -- next odd power slot: 5..15
             -- seed next: A^5 = A^3 * A^2
-            for i in 0 to cur_lanes-1 loop
-              batchA(i) <= batchR(i);      -- A^3
-              batchB(i) <= A2_5(i);        -- A^2
+            -- CLEAR
+            for i in 0 to LANES-1 loop
+              batchA(i) <= (others => '0');
+              batchB(i) <= (others => '0');
+            end loop;
+            -- FILL (A^5 = A^3 * A^2)
+            for i in 0 to LANES-1 loop
+              if i < cur_lanes then
+                batchA(i) <= batchR(i);      -- A^3
+                batchB(i) <= A2_5(i);        -- A^2
+              end if;
             end loop;
             issue_idx <= 0;
             mpb_st <= MPB_KICK;
@@ -518,18 +566,28 @@ begin
           
         when S_PRECOMP_GEN =>
           if mp_batch_done = '1' then
-            for i in 0 to cur_lanes-1 loop
-              tbl5(i)(tbl_idx) <= batchR(i);
+            for i in 0 to LANES-1 loop
+              if i < cur_lanes then
+                tbl5(i)(tbl_idx) <= batchR(i);
+              end if;
             end loop;
             if tbl_idx = 7 then
               st <= S_LOAD_VLNW;   -- done with precompute for all 5
             else
               tbl_idx <= tbl_idx + 1;
               -- Next odd = prev_odd * A^2
-              for i in 0 to cur_lanes-1 loop
+              -- CLEAR
+            for i in 0 to LANES-1 loop
+              batchA(i) <= (others => '0');
+              batchB(i) <= (others => '0');
+            end loop;
+            -- FILL (next odd = prev_odd * A^2)
+            for i in 0 to LANES-1 loop
+              if i < cur_lanes then
                 batchA(i) <= batchR(i);
                 batchB(i) <= A2_5(i);
-              end loop;
+              end if;
+            end loop;
               issue_idx <= 0;
               mpb_st <= MPB_KICK;
             end if;
@@ -558,8 +616,10 @@ begin
           st <= S_GEN_ODD;
 
        when S_LOAD_VLNW =>
-          for i in 0 to cur_lanes-1 loop
-            acc5(i) <= oneM5(i);
+          for i in 0 to LANES-1 loop
+            if i < cur_lanes then
+              acc5(i) <= oneM5(i);
+            end if;
           end loop;
           vlnw_load <= '1';
           st        <= S_VLNW_ARM;
@@ -574,17 +634,33 @@ begin
         when S_WAIT_OP =>
           if vlnw_done = '1' then
             -- fromMont for all lanes
-            for i in 0 to cur_lanes-1 loop
-              batchA(i) <= acc5(i);
-              batchB(i) <= (others => '0'); batchB(i)(0) <= '1';
+            -- CLEAR
+            for i in 0 to LANES-1 loop
+              batchA(i) <= (others => '0');
+              batchB(i) <= (others => '0');
+            end loop;
+            -- FILL
+            for i in 0 to LANES-1 loop
+              if i < cur_lanes then
+                batchA(i) <= acc5(i);
+                batchB(i) <= (others => '0'); batchB(i)(0) <= '1';
+              end if;
             end loop;
             issue_idx <= 0;
             mpb_st <= MPB_KICK;
             st     <= S_FROM_MONT;
           elsif vlnw_op = "01" and mpb_st = MPB_IDLE then  -- SQUARE
-            for i in 0 to cur_lanes-1 loop
-              batchA(i) <= acc5(i);
-              batchB(i) <= acc5(i);
+            -- CLEAR
+            for i in 0 to LANES-1 loop
+              batchA(i) <= (others => '0');
+              batchB(i) <= (others => '0');
+            end loop;
+            -- FILL
+            for i in 0 to LANES-1 loop
+              if i < cur_lanes then
+                batchA(i) <= acc5(i);
+                batchB(i) <= acc5(i);
+              end if;
             end loop;
             issue_idx <= 0;
             mpb_st <= MPB_KICK;
@@ -595,9 +671,17 @@ begin
             mul_addr_latched <= vlnw_addr;
             idx := vlnw_code_to_index(vlnw_addr);
             assert idx >= 0 report "VLNW addr invalid/zero for multiply" severity failure;
-            for i in 0 to cur_lanes-1 loop
-              batchA(i) <= acc5(i);
-              batchB(i) <= tbl5(i)(idx);
+            -- CLEAR
+            for i in 0 to LANES-1 loop
+              batchA(i) <= (others => '0');
+              batchB(i) <= (others => '0');
+            end loop;
+            -- FILL
+            for i in 0 to LANES-1 loop
+              if i < cur_lanes then
+                batchA(i) <= acc5(i);
+                batchB(i) <= tbl5(i)(idx);
+              end if;
             end loop;
             issue_idx <= 0;
             mpb_st <= MPB_KICK;
@@ -631,8 +715,10 @@ begin
         -- Wait for MonPro to finish, then update acc and print       
         when S_WAIT_MP =>
           if mp_batch_done = '1' then
-            for i in 0 to cur_lanes-1 loop
-              acc5(i) <= batchR(i);
+            for i in 0 to LANES-1 loop
+              if i < cur_lanes then
+                acc5(i) <= batchR(i);
+              end if;
             end loop;
             -- bump counters if you like (squares/multiplies)
             st <= S_CHECK_VLNW_DONE;
